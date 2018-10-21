@@ -1,76 +1,133 @@
 --------------------------------------------------------------------------------
-{-# LANGUAGE OverloadedStrings #-}
-import Data.Monoid (mappend)
-import Hakyll
-import Control.Applicative
+{-# LANGUAGE Arrows             #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings  #-}
+
 
 --------------------------------------------------------------------------------
+import           Data.Monoid     ((<>))
+import           Prelude         hiding (id)
+import           System.Exit     (ExitCode)
+
+
+--------------------------------------------------------------------------------
+import           Hakyll
+
+
+--------------------------------------------------------------------------------
+-- | Entry point
 main :: IO ()
 main = hakyll $ do
-    match "images/*" $ do
+    -- Static files
+    match ("images/*.jpg" .||. "images/*.png" .||. "images/*.gif" .||.
+            "favicon.ico" .||. "files/**") $ do
         route   idRoute
         compile copyFileCompiler
 
-    match "css/*" $ do
-        route   idRoute
-        compile compressCssCompiler
+    -- Dot images
+    match "images/*.dot" $ do
+        route   $ setExtension "png"
+        compile $ getResourceLBS >>= traverse (unixFilterLBS "dot" ["-Tpng"])
 
-    match (fromList ["about.rst", "contact.md"]) $ do
-        route   $ setExtension "html"
-        compile $ pandocCompiler
-            >>= loadAndApplyTemplate "templates/default.html" siteCtx
-            >>= relativizeUrls
+    -- Compress CSS into one file.
+    match "css/*" $ compile compressCssCompiler
+    create ["style.css"] $ do
+        route idRoute
+        compile $ do
+            csses <- loadAll "css/*.css"
+            makeItem $ unlines $ map itemBody csses
 
+    -- Build tags
+    tags <- buildTags "posts/*" (fromCapture "tags/*.html")
+
+    -- Render each and every post
     match "posts/*" $ do
-        route $ setExtension "html"
-        compile $ pandocCompiler
-            >>= loadAndApplyTemplate "templates/post.html"    postCtx
-            >>= loadAndApplyTemplate "templates/default.html" postCtx
-            >>= relativizeUrls
+        route   $ setExtension ".html"
+        compile $ do
+            pandocCompiler
+                >>= saveSnapshot "content"
+                >>= return . fmap demoteHeaders
+                >>= loadAndApplyTemplate "templates/post.html" (postCtx tags)
+                >>= loadAndApplyTemplate "templates/content.html" defaultContext
+                >>= loadAndApplyTemplate "templates/default.html" defaultContext
+                >>= relativizeUrls
 
-    create ["archive.html"] $ do
+    -- Post list
+    create ["posts.html"] $ do
         route idRoute
         compile $ do
             posts <- recentFirst =<< loadAll "posts/*"
-            let archiveCtx =
-                    listField "posts" postCtx (return posts) `mappend`
-                    constField "title" "Archives"            `mappend`
-                    siteCtx
-
+            let ctx = constField "title" "Posts" <>
+                        listField "posts" (postCtx tags) (return posts) <>
+                        defaultContext
             makeItem ""
-                >>= loadAndApplyTemplate "templates/archive.html" archiveCtx
-                >>= loadAndApplyTemplate "templates/default.html" archiveCtx
+                >>= loadAndApplyTemplate "templates/posts.html" ctx
+                >>= loadAndApplyTemplate "templates/content.html" ctx
+                >>= loadAndApplyTemplate "templates/default.html" ctx
                 >>= relativizeUrls
 
+    -- Post tags
+    tagsRules tags $ \tag pattern -> do
+        let title = "Posts tagged " ++ tag
+
+        -- Copied from posts, need to refactor
+        route idRoute
+        compile $ do
+            posts <- recentFirst =<< loadAll pattern
+            let ctx = constField "title" title <>
+                        listField "posts" (postCtx tags) (return posts) <>
+                        defaultContext
+            makeItem ""
+                >>= loadAndApplyTemplate "templates/posts.html" ctx
+                >>= loadAndApplyTemplate "templates/content.html" ctx
+                >>= loadAndApplyTemplate "templates/default.html" ctx
+                >>= relativizeUrls
+
+    -- Index
     match "index.html" $ do
         route idRoute
         compile $ do
-            posts <- recentFirst =<< loadAll "posts/*"
-            let indexCtx =
-                    listField "posts" postCtx (return posts) `mappend`
-                    constField "title" "Home"                `mappend`
-                    siteCtx
+            posts <- fmap (take 3) . recentFirst =<< loadAll "posts/*"
+            let indexContext =
+                    listField "posts" (postCtx tags) (return posts) <>
+                    field "tags" (\_ -> renderTagList tags) <>
+                    defaultContext
 
             getResourceBody
-                >>= applyAsTemplate indexCtx
-                >>= loadAndApplyTemplate "templates/default.html" indexCtx
+                >>= applyAsTemplate indexContext
+                >>= loadAndApplyTemplate "templates/content.html" indexContext
+                >>= loadAndApplyTemplate "templates/default.html" indexContext
                 >>= relativizeUrls
 
-    match "templates/*" $ compile templateCompiler
+    -- Read templates
+    match "templates/*" $ compile $ templateCompiler
+
+    -- Render some static pages
+    match (fromList pages) $ do
+        route   $ setExtension ".html"
+        compile $ pandocCompiler
+            >>= loadAndApplyTemplate "templates/content.html" defaultContext
+            >>= loadAndApplyTemplate "templates/default.html" defaultContext
+            >>= relativizeUrls
+
+    -- Render the 404 page, we don't relativize URL's here.
+    match "404.html" $ do
+        route idRoute
+        compile $ pandocCompiler
+            >>= loadAndApplyTemplate "templates/content.html" defaultContext
+            >>= loadAndApplyTemplate "templates/default.html" defaultContext
+
+  where
+    pages =
+        [ "contact.md"
+        , "links.md"
+        ]
 
 --------------------------------------------------------------------------------
-postCtx :: Context String
-postCtx =
-    dateField "date" "%B %e, %Y" `mappend`
-    siteCtx
-
-siteCtx :: Context String
-siteCtx = 
-    activeClassField `mappend`
-    defaultContext
-
--- https://groups.google.com/forum/#!searchin/hakyll/if$20class/hakyll/WGDYRa3Xg-w/nMJZ4KT8OZUJ 
-activeClassField :: Context a 
-activeClassField = functionField "activeClass" $ \[p] _ -> do 
-    path <- toFilePath <$> getUnderlying 
-    return $ if path == p then "active" else path 
+postCtx :: Tags -> Context String
+postCtx tags = mconcat
+    [ modificationTimeField "mtime" "%U"
+    , dateField "date" "%B %e, %Y"
+    , tagsField "tags" tags
+    , defaultContext
+    ]
