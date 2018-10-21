@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Preview the site
+set -ex
+
+site="$(grep 'name' *.cabal | sed 's/name:\s\+//')"
+
+stack exec "$site" rebuild
+
+stack exec "$site" watch
