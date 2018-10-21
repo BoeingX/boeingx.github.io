@@ -12,7 +12,6 @@ Tags: black, dark, custom-colors, theme-options, two-columns, fixed-width, rtl-l
 @import url(https://fonts.googleapis.com/css?family=Lato:300,400,700|Merriweather:400,400italic,700|Halant:300,400,500|Over+the+Rainbow)
 ;
 
-@import url("font-awesome.css");
 html, body {
   margin: 0;
   padding: 0;
