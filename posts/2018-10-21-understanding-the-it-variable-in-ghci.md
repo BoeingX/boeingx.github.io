@@ -4,6 +4,8 @@ description: The mythical "it" variable in GHCi explained
 tags: haskell
 ---
 
+## Introduction
+
 As we are told from the very beginning, Haskell is a [purely functional](https://en.wikipedia.org/wiki/Purely_functional_programming),
 strongly [statically typed](https://en.wikipedia.org/wiki/Static_typing) programming language.
 
@@ -51,6 +53,8 @@ True
 So, what happens?!
 It seems that not only we can assign values several times to `it`
 but also that the values could have different types!
+
+## Dive in
 
 The question seems very natural, yet there are only a few discussion around it on the Internet.
 What's more, it is rather difficult to find such discussions because
