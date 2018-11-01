@@ -1,5 +1,5 @@
 ---
-title: The Implementation of (!!) Operator in Haskell
+title: foldr and implementation of the (!!) in Haskell
 description: Explain the not-so-obvious usage of foldr in the implementation of list index operator (!!) through type inspection and a simple example.
 tags: haskell
 ---
@@ -192,3 +192,11 @@ What is the result of
 ~~~~~{.haskell}
 foldr const undefined [1, undefined, undefined]
 ~~~~~
+
+3. Will the following expression terminates? If yes, what is the result? If not, why?
+
+~~~~~{.haskell}
+foldr (\x acc -> if x >= 10 then x else x + acc) 0 [1..]
+~~~~~
+
+What happens if we use `foldl` instead of `foldr`?
