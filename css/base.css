@@ -80,7 +80,7 @@ code {
     color: #408090;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4 {
     font-weight: normal;
 }
 
@@ -93,6 +93,10 @@ h2 {
 }
 
 h3 {
+    font-size: 20px;
+}
+
+h4 {
     font-size: 18px;
 }
 
