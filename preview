@@ -3,8 +3,8 @@
 # Preview the site
 set -ex
 
-site="$(grep 'name' *.cabal | sed 's/name:\s\+//')"
+site=boeingx
 
-stack exec "$site" rebuild
+stack exec "$site" rebuild | (stack build && stack exec "$site" build)
 
 stack exec "$site" watch
