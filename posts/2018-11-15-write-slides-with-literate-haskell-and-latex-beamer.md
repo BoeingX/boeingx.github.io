@@ -6,7 +6,7 @@ tags: latex, beamer, haskell, literate programming
 
 ## Introduction
 
-> TL;DR: Check this [GitHub Gist](https://gist.github.com/BoeingX/df9283c01e4f348a784b50af0b450605) and enjoy writing :)
+> TL;DR: Check this [GitHub Repository](https://github.com/BoeingX/beamer-template-for-literate-haskell) and enjoy writing :)
 
 [Literate programming](https://en.wikipedia.org/wiki/Literate_programming), introduced by [Donald Knuth](https://www-cs-faculty.stanford.edu/~knuth/)[^WEB],
 is a programming paradigm where source code is written
