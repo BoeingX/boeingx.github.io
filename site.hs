@@ -9,7 +9,6 @@ import           Data.Monoid     ((<>))
 import           Prelude         hiding (id)
 import           System.Exit     (ExitCode)
 
-
 --------------------------------------------------------------------------------
 import           Hakyll
 
