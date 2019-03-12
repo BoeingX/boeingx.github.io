@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-73013152-3"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'UA-73013152-3');
+        </script>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+
+        <title>BoeingX - foldr and implementation of the (!!) in Haskell</title>
+
+        <!-- Stylesheets. -->
+        <link rel="stylesheet" type="text/css" href="../style.css" />
+
+        <!-- Metadata. -->
+        <meta name="keywords" content="Baoyang SONG,boeingx,blog,programming,coding,haskell,function,personal,homepage" />
+        <meta name="description" content="Personal home page and blog of BoeingX." />
+    </head>
+    <body>
+        <div id="navigation">
+            <h1>Codopia</h1>
+            <a href="../">Home</a>
+            <a href="../posts.html">Archive</a>
+            <a href="../contact.html">Contact</a>
+            <h1>Links</h1>
+            <a href="https://github.com/BoeingX">GitHub</a>
+            <a href="https://www.linkedin.com/in/baoyang-song">LinkedIn</a>
+        </div>
+
+        <div id="content">
+    <h1>foldr and implementation of the (!!) in Haskell</h1>
+<div class="soft">
+    <em> Explain the not-so-obvious usage of foldr in the implementation of list index operator (!!) through type inspection and a simple example.</em>
+    <br />
+    <br />
+    Published on October 30, 2018 under the tag <a href="../tags/haskell.html">haskell</a>
+</div>
+
+<h3 id="introduction">Introduction</h3>
+<p>If you come from an imperative language, you are certainly familiar with the list index operator <code>[]</code>, which is used to access arbitrary elements in an array in constant time. In Haskell, however, the omnipresent list <code>[a]</code> is more like a linked list (there does exist an <a href="https://hackage.haskell.org/package/array">array data structure</a> in GHC base) defined in <a href="https://hackage.haskell.org/package/ghc-prim-0.5.3/docs/GHC-Types.html">GHC.Types</a> as follows</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">data</span> [] a <span class="fu">=</span> [] <span class="fu">|</span> a <span class="fu">:</span> [a]</a></code></pre></div>
+<p>To access an arbitrary element in a list, we use the (!!) operator. For example</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" title="1"><span class="dt">Prelude</span><span class="fu">&gt;</span> <span class="kw">let</span> xs <span class="fu">=</span> [<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]</a>
+<a class="sourceLine" id="cb2-2" title="2"><span class="dt">Prelude</span><span class="fu">&gt;</span> xs <span class="fu">!!</span> <span class="dv">1</span></a>
+<a class="sourceLine" id="cb2-3" title="3"><span class="dv">2</span></a>
+<a class="sourceLine" id="cb2-4" title="4"><span class="dt">Prelude</span><span class="fu">&gt;</span> xs <span class="fu">!!</span> (<span class="fu">-</span><span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb2-5" title="5"><span class="fu">***</span> <span class="dt">Exception</span><span class="fu">:</span> <span class="fu">Prelude.!!:</span> negative <span class="fu">index</span></a>
+<a class="sourceLine" id="cb2-6" title="6"><span class="dt">Prelude</span><span class="fu">&gt;</span> xs <span class="fu">!!</span> <span class="dv">4</span></a>
+<a class="sourceLine" id="cb2-7" title="7"><span class="fu">***</span> <span class="dt">Exception</span><span class="fu">:</span> <span class="fu">Prelude.!!:</span> <span class="fu">index</span> too large</a></code></pre></div>
+<p>Note that because of the nature of list, (!!) has linear time complexity. In other words, to access the last element, you will have to traverse the <strong>entire</strong> list.</p>
+<p>An intuitive implementation of (!!) could be</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" title="1"><span class="ot">(!!) ::</span> [a] <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> a</a>
+<a class="sourceLine" id="cb3-2" title="2">xs <span class="fu">!!</span> n</a>
+<a class="sourceLine" id="cb3-3" title="3">    <span class="fu">|</span> n <span class="fu">&lt;</span> <span class="dv">0</span> <span class="fu">=</span> <span class="fu">error</span> <span class="st">&quot;negative index&quot;</span></a>
+<a class="sourceLine" id="cb3-4" title="4">[] <span class="fu">!!</span> _ <span class="fu">=</span> <span class="fu">error</span> <span class="st">&quot;index too large&quot;</span></a>
+<a class="sourceLine" id="cb3-5" title="5">(x<span class="fu">:</span>xs) <span class="fu">!!</span> n</a>
+<a class="sourceLine" id="cb3-6" title="6">    <span class="fu">|</span> n <span class="fu">==</span> <span class="dv">0</span>    <span class="fu">=</span> x</a>
+<a class="sourceLine" id="cb3-7" title="7">    <span class="fu">|</span> <span class="fu">otherwise</span> <span class="fu">=</span> xs <span class="fu">!!</span> (n <span class="fu">-</span> <span class="dv">1</span>)</a></code></pre></div>
+<p>The above implementation being a <a href="https://en.wikipedia.org/wiki/Tail_call">tail recursion</a>, it is optimized by GHC and becomes essentially a loop. Therefore, you will not get a “max recursion depth” error for a very large list as in imperative languages.</p>
+<p>However, if you check the <a href="https://hackage.haskell.org/package/base-4.12.0.0/docs/src/GHC.List.html#%21%21">GHC source code</a>, this function is actually implements as follows</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" title="1"><span class="ot">(!!)                    ::</span> [a] <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> a</a>
+<a class="sourceLine" id="cb4-2" title="2"><span class="ot">#if defined(USE_REPORT_PRELUDE)</span></a>
+<a class="sourceLine" id="cb4-3" title="3">xs     <span class="fu">!!</span> n <span class="fu">|</span> n <span class="fu">&lt;</span> <span class="dv">0</span> <span class="fu">=</span>  errorWithoutStackTrace <span class="st">&quot;Prelude.!!: negative index&quot;</span></a>
+<a class="sourceLine" id="cb4-4" title="4">[]     <span class="fu">!!</span> _         <span class="fu">=</span>  errorWithoutStackTrace <span class="st">&quot;Prelude.!!: index too large&quot;</span></a>
+<a class="sourceLine" id="cb4-5" title="5">(x<span class="fu">:</span>_)  <span class="fu">!!</span> <span class="dv">0</span>         <span class="fu">=</span>  x</a>
+<a class="sourceLine" id="cb4-6" title="6">(_<span class="fu">:</span>xs) <span class="fu">!!</span> n         <span class="fu">=</span>  xs <span class="fu">!!</span> (n<span class="fu">-</span><span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-7" title="7"><span class="ot">#else</span></a>
+<a class="sourceLine" id="cb4-8" title="8"></a>
+<a class="sourceLine" id="cb4-9" title="9"><span class="co">-- We don't really want the errors to inline with (!!).</span></a>
+<a class="sourceLine" id="cb4-10" title="10"><span class="co">-- We may want to fuss around a bit with NOINLINE, and</span></a>
+<a class="sourceLine" id="cb4-11" title="11"><span class="co">-- if so we should be careful not to trip up known-bottom</span></a>
+<a class="sourceLine" id="cb4-12" title="12"><span class="co">-- optimizations.</span></a>
+<a class="sourceLine" id="cb4-13" title="13"><span class="ot">tooLarge ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> a</a>
+<a class="sourceLine" id="cb4-14" title="14">tooLarge _ <span class="fu">=</span> errorWithoutStackTrace (prel_list_str <span class="fu">++</span> <span class="st">&quot;!!: index too large&quot;</span>)</a>
+<a class="sourceLine" id="cb4-15" title="15"></a>
+<a class="sourceLine" id="cb4-16" title="16"><span class="ot">negIndex ::</span> a</a>
+<a class="sourceLine" id="cb4-17" title="17">negIndex <span class="fu">=</span> errorWithoutStackTrace <span class="fu">$</span> prel_list_str <span class="fu">++</span> <span class="st">&quot;!!: negative index&quot;</span></a>
+<a class="sourceLine" id="cb4-18" title="18"></a>
+<a class="sourceLine" id="cb4-19" title="19"><span class="ot">{-# INLINABLE (!!) #-}</span></a>
+<a class="sourceLine" id="cb4-20" title="20">xs <span class="fu">!!</span> n</a>
+<a class="sourceLine" id="cb4-21" title="21">  <span class="fu">|</span> n <span class="fu">&lt;</span> <span class="dv">0</span>     <span class="fu">=</span> negIndex</a>
+<a class="sourceLine" id="cb4-22" title="22">  <span class="fu">|</span> <span class="fu">otherwise</span> <span class="fu">=</span> <span class="fu">foldr</span> (\x r k <span class="ot">-&gt;</span> <span class="kw">case</span> k <span class="kw">of</span></a>
+<a class="sourceLine" id="cb4-23" title="23">                                   <span class="dv">0</span> <span class="ot">-&gt;</span> x</a>
+<a class="sourceLine" id="cb4-24" title="24">                                   _ <span class="ot">-&gt;</span> r (k<span class="fu">-</span><span class="dv">1</span>)) tooLarge xs n</a>
+<a class="sourceLine" id="cb4-25" title="25"><span class="ot">#endif</span></a></code></pre></div>
+<p>As we can see, there are two implementations where the first implementation is exactly what we previously gave. Which of them gets compiled depends on where <code>USER_REPORT_PRELUDE</code> is defined. In general, the blocks in <code>USER_REPORT_PRELUDE</code> are legacy code and no longer used (see <a href="https://mail.haskell.org/pipermail/ghc-devs/2014-October/006948.html">this discussion</a>). and those in the <code>else</code> block are generally more (time or space) efficient.</p>
+<p>Ignore for now the <code>INLINABLE</code> pragma, we can see that it is essentially the <code>foldr</code> that differents the second implementation from the first one. <code>foldr</code> is generally more efficient than explicite recursion because it is systematically optimized by GHC (see <a href="https://www.stackbuilders.com/tutorials/haskell/ghc-optimization-and-fusion/">this post</a>).</p>
+<h3 id="what-type">What type?</h3>
+<p>Recall that <code>foldr</code> has the following type</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb5-1" title="1"><span class="fu">foldr</span><span class="ot"> ::</span> (a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> b</a></code></pre></div>
+<p>Given a binary operator <code>f :: a -&gt; b -&gt; b</code>, a list <code>xs = [x1, x2, ..., xn]</code> and an initial value <code>z</code>, <code>foldr</code> can be thought as</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb6-1" title="1"><span class="fu">foldr</span> f z xs <span class="fu">=</span> x1 <span class="ot">`f`</span> ( x2 <span class="ot">`f`</span> ( <span class="fu">..</span> (xn <span class="ot">`f`</span> z) <span class="fu">...</span> )</a></code></pre></div>
+<p>If you inspect the second implementation, however, the use of <code>foldr</code> is somewhat unusual: 1) why there are three arguments <code>x</code>, <code>r</code> and <code>k</code> in the <strong>binary</strong> operator and 2) why we have a <code>n</code> after the list <code>xs</code>?</p>
+<p>To understand this, let’s first identify the <code>a</code> and <code>b</code> in the type of <code>foldr</code>. Note <code>xs :: [a]</code>, since <code>tooLarge :: Int -&gt; a</code>, actually the only possibility would be</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb7-1" title="1"><span class="fu">foldr</span><span class="ot"> ::</span> (a <span class="ot">-&gt;</span> (<span class="dt">Int</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> (<span class="dt">Int</span> <span class="ot">-&gt;</span> a)) <span class="ot">-&gt;</span> (<span class="dt">Int</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> (<span class="dt">Int</span> <span class="ot">-&gt;</span> a)</a></code></pre></div>
+<p>If you fancy playing with GHCi, you can assert this as follows</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb8-1" title="1"><span class="dt">Prelude</span><span class="fu">&gt;</span> <span class="kw">let</span><span class="ot"> xs ::</span> [a] ; xs <span class="fu">=</span> <span class="fu">undefined</span></a>
+<a class="sourceLine" id="cb8-2" title="2"><span class="dt">Prelude</span><span class="fu">&gt;</span> <span class="kw">let</span><span class="ot"> tooLarge ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> a ; tooLarge <span class="fu">=</span> <span class="fu">undefined</span></a>
+<a class="sourceLine" id="cb8-3" title="3"><span class="dt">Prelude</span><span class="fu">&gt;</span> <span class="fu">:</span>t \f <span class="ot">-&gt;</span> <span class="fu">foldr</span> f tooLarge xs</a>
+<a class="sourceLine" id="cb8-4" title="4">\f <span class="ot">-&gt;</span> <span class="fu">foldr</span> f tooLarge xs</a>
+<a class="sourceLine" id="cb8-5" title="5"><span class="ot">  ::</span> (a1 <span class="ot">-&gt;</span> (<span class="dt">Int</span> <span class="ot">-&gt;</span> a2) <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> a2) <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> a2</a></code></pre></div>
+<p>Since <code>(-&gt;)</code> is right associative, this matches exactly our assertion.</p>
+<p>With this type in mind, it is easy to answer the two questions:</p>
+<ul>
+<li>The binary operator <code>f</code> has three arguments <code>x</code>, <code>r</code> and <code>k</code> because of <a href="https://wiki.haskell.org/Currying">currying</a>. If you haven’t got it, the following rewriting may help you</li>
+</ul>
+<div class="sourceCode" id="cb9"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb9-1" title="1">\x r <span class="ot">-&gt;</span> \k <span class="ot">-&gt;</span> <span class="kw">case</span> k <span class="kw">of</span></a>
+<a class="sourceLine" id="cb9-2" title="2">                <span class="dv">0</span> <span class="ot">-&gt;</span> x</a>
+<a class="sourceLine" id="cb9-3" title="3">                _ <span class="ot">-&gt;</span> r (k <span class="fu">-</span> <span class="dv">1</span>)</a></code></pre></div>
+<ul>
+<li>There is a <code>n :: Int</code> at the end of <code>foldr</code> because the fully applied <code>foldr</code> gives a <strong>function</strong> <code>Int -&gt; a</code>. In other words, <code>n</code> is the argument of that function.</li>
+</ul>
+<h3 id="example">Example</h3>
+<p>Let’s take an example to see this implementation in action. Suppose that <code>xs = [0, 1, 2, 3]</code> and we want to evaluate <code>xs !! 2</code>, note <code>f = \x r k -&gt; case k of 0 -&gt; x ; _ -&gt; r (k - 1)</code>, then</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb10-1" title="1">xs <span class="fu">!!</span> <span class="dv">2</span> <span class="fu">=</span> <span class="fu">foldr</span> f tooLarge xs <span class="dv">2</span></a>
+<a class="sourceLine" id="cb10-2" title="2">        <span class="fu">=</span> <span class="dv">0</span> <span class="ot">`f`</span> ( <span class="dv">1</span> <span class="ot">`f`</span> ( <span class="dv">2</span> <span class="ot">`f`</span> ( <span class="dv">3</span> <span class="ot">`f`</span> tooLarge ) ) ) <span class="dv">2</span></a>
+<a class="sourceLine" id="cb10-3" title="3"><span class="co">--        |     |____________________________________| |</span></a>
+<a class="sourceLine" id="cb10-4" title="4"><span class="co">--        x                       r                    k</span></a>
+<a class="sourceLine" id="cb10-5" title="5"><span class="co">-- because k = 2 /= 0, so the second branch of case gets evaluated</span></a>
+<a class="sourceLine" id="cb10-6" title="6"><span class="co">-- now we have r (k - 1)</span></a>
+<a class="sourceLine" id="cb10-7" title="7">        <span class="fu">=</span> (<span class="dv">1</span> <span class="ot">`f`</span> ( <span class="dv">2</span> <span class="ot">`f`</span> ( <span class="dv">3</span> <span class="ot">`f`</span> tooLarge ) ) ) <span class="dv">1</span></a>
+<a class="sourceLine" id="cb10-8" title="8"><span class="co">--        |___________________________________| |</span></a>
+<a class="sourceLine" id="cb10-9" title="9"><span class="co">--                          r                  k-1</span></a>
+<a class="sourceLine" id="cb10-10" title="10">        <span class="fu">=</span> <span class="dv">1</span> <span class="ot">`f`</span> ( <span class="dv">2</span> <span class="ot">`f`</span> ( <span class="dv">3</span> <span class="ot">`f`</span> tooLarge ) ) <span class="dv">1</span></a>
+<a class="sourceLine" id="cb10-11" title="11"><span class="co">--        |     |__________________________| |</span></a>
+<a class="sourceLine" id="cb10-12" title="12"><span class="co">--        x                  r               k   &lt;-- alpha equivalence</span></a>
+<a class="sourceLine" id="cb10-13" title="13">        <span class="fu">=</span> ( <span class="dv">2</span> <span class="ot">`f`</span> ( <span class="dv">3</span> <span class="ot">`f`</span> tooLarge ) ) <span class="dv">0</span></a>
+<a class="sourceLine" id="cb10-14" title="14"><span class="co">--        |__________________________| |</span></a>
+<a class="sourceLine" id="cb10-15" title="15"><span class="co">--                     r              k-1</span></a>
+<a class="sourceLine" id="cb10-16" title="16">        <span class="fu">=</span> <span class="dv">2</span> <span class="ot">`f`</span> ( <span class="dv">3</span> <span class="ot">`f`</span> tooLarge ) <span class="dv">0</span></a>
+<a class="sourceLine" id="cb10-17" title="17"><span class="co">--        |     |________________| |</span></a>
+<a class="sourceLine" id="cb10-18" title="18"><span class="co">--        x             r          k</span></a>
+<a class="sourceLine" id="cb10-19" title="19"><span class="co">-- this time k = 0 so the first branch of case is fired</span></a>
+<a class="sourceLine" id="cb10-20" title="20"><span class="co">-- we get simply x = 2</span></a>
+<a class="sourceLine" id="cb10-21" title="21">        <span class="fu">=</span> <span class="dv">2</span></a></code></pre></div>
+<p>As we can see from this example, though <code>foldr</code> generally evaluates from right to left, we get a function waiting for an argument as the result of <code>foldr</code>. When we feed it with an argument, we happen to evaluate from left to right. Otherwise, <code>xs !! n</code> would have given the <code>n</code>-th element from right.</p>
+<h3 id="exercises">Exercises</h3>
+<ol type="1">
+<li><p>Take <code>k = -1</code> and <code>k = 4</code> with the same <code>xs</code>, try to see why <code>xs !! k</code> gives <code>negative index</code> and <code>index too large</code> exceptions respectively.</p></li>
+<li><p>Given that</p></li>
+</ol>
+<div class="sourceCode" id="cb11"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb11-1" title="1"><span class="fu">const</span><span class="ot"> ::</span> a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> a</a>
+<a class="sourceLine" id="cb11-2" title="2"><span class="fu">const</span> a _ <span class="fu">=</span> a</a></code></pre></div>
+<p>What is the result of</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb12-1" title="1"><span class="fu">foldr</span> <span class="fu">const</span> <span class="fu">undefined</span> [<span class="dv">1</span>, <span class="fu">undefined</span>, <span class="fu">undefined</span>]</a></code></pre></div>
+<ol start="3" type="1">
+<li>Will the following expression terminates? If yes, what is the result? If not, why?</li>
+</ol>
+<div class="sourceCode" id="cb13"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb13-1" title="1"><span class="fu">foldr</span> (\x acc <span class="ot">-&gt;</span> <span class="kw">if</span> x <span class="fu">&gt;=</span> <span class="dv">10</span> <span class="kw">then</span> x <span class="kw">else</span> x <span class="fu">+</span> acc) <span class="dv">0</span> [<span class="dv">1</span><span class="fu">..</span>]</a></code></pre></div>
+<p>What happens if we use <code>foldl</code> instead of <code>foldr</code>?</p>
+
+<div id="disqus_thread"></div>
+<script>
+
+/**
+*  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+*  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+var disqus_config = function () {
+this.page.url = "https://boeingx.github.io/posts/2018-10-30-foldr-and-implementation-of-list-index-operator-in-haskell.html";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = this.page.url; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+};
+(function() { // DON'T EDIT BELOW THIS LINE
+var d = document, s = d.createElement('script');
+s.src = 'https://boeingx.disqus.com/embed.js';
+s.setAttribute('data-timestamp', +new Date());
+(d.head || d.body).appendChild(s);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+
+    <div style="clear: both"></div>
+
+    <div id="footer">
+        Site proudly generated by
+        <a href="https://jaspervdj.be/hakyll">Hakyll</a>.
+        The source code of this website is
+        <a href="https://github.com/BoeingX/boeingx.github.io">
+        available on github</a>.
+    </div>
+</div>
+
+    </body>
+</html>

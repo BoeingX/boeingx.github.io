@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-73013152-3"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'UA-73013152-3');
+        </script>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+
+        <title>BoeingX - Write slides with literate Haskell and LaTeX Beamer</title>
+
+        <!-- Stylesheets. -->
+        <link rel="stylesheet" type="text/css" href="../style.css" />
+
+        <!-- Metadata. -->
+        <meta name="keywords" content="Baoyang SONG,boeingx,blog,programming,coding,haskell,function,personal,homepage" />
+        <meta name="description" content="Personal home page and blog of BoeingX." />
+    </head>
+    <body>
+        <div id="navigation">
+            <h1>Codopia</h1>
+            <a href="../">Home</a>
+            <a href="../posts.html">Archive</a>
+            <a href="../contact.html">Contact</a>
+            <h1>Links</h1>
+            <a href="https://github.com/BoeingX">GitHub</a>
+            <a href="https://www.linkedin.com/in/baoyang-song">LinkedIn</a>
+        </div>
+
+        <div id="content">
+    <h1>Write slides with literate Haskell and LaTeX Beamer</h1>
+<div class="soft">
+    <em> How to take the best of both worlds without pain.</em>
+    <br />
+    <br />
+    Published on November 15, 2018 under the tag <a href="../tags/latex.html">latex</a>, <a href="../tags/beamer.html">beamer</a>, <a href="../tags/haskell.html">haskell</a>, <a href="../tags/literate%20programming.html">literate programming</a>
+</div>
+
+<h3 id="introduction">Introduction</h3>
+<blockquote>
+<p>TL;DR: Check this <a href="https://github.com/BoeingX/beamer-template-for-literate-haskell">GitHub Repository</a> and enjoy writing :)</p>
+</blockquote>
+<p><a href="https://en.wikipedia.org/wiki/Literate_programming">Literate programming</a>, introduced by <a href="https://www-cs-faculty.stanford.edu/~knuth/">Donald Knuth</a><a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>, is a programming paradigm where source code is written interleaved with text in natural language in a way that it is both a valid document (for example, article) and compilable (or interpretable) program.</p>
+<p>If you are familiar with <a href="http://www.doxygen.org/">Doxygen</a> or <a href="http://www.sphinx-doc.org/en/master/">Sphinx</a> which generate documentation from the comments of source code, you can consider literate programming as the opposite: it is the source code in documentation. The idea behind is best explained by Knuth’s own words</p>
+<blockquote>
+<p>“The main idea is to regard a program as a communication to human beings rather than as a set of instructions to a computer.”</p>
+</blockquote>
+<h3 id="literate-programming-in-haskell">Literate programming in Haskell</h3>
+<p>If you are data scientist like me, you must be familiar with <a href="https://jupyter.org/">Jupyter Notebook</a> where we can write Markdown or even LaTeX snippet along with Python<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a> (or many others through <a href="https://en.wikipedia.org/wiki/Project_Jupyter#Jupyter_kernels">kernels</a>) code. So basically you are using literate programming everyday!</p>
+<p>However, I personally find two inconveniences with Jupyter</p>
+<ul>
+<li>Python does not support literate programming <strong>natively</strong>, which means we have to install <strong>many</strong> dependencies in order to use it.</li>
+<li>The underlying serialization of Jupyter notebooks is JSON and it is extremely difficult to work with in text editors or on remote machines with strict firewall.</li>
+</ul>
+<p>Haskell, on the other hand, is one of <a href="https://en.wikipedia.org/wiki/Literate_programming#Tools">the few languages</a> that support literate programming natively. In other words, files written in literate Haskell can be compiled directly with GHC or loaded into GHCi.</p>
+<p>Instead of the normal <code>.hs</code> extension, a literate program ends with <code>.lhs</code> where <code>l</code> means literate (surprise!). To tell GHC a portion of text is code, we have two options</p>
+<ul>
+<li>Prepend all code with a <code>&gt;</code> (Bird style)</li>
+<li>Surround lines of code with <code>\begin{code}</code> and <code>\end{code}</code> pairs (LaTeX style)</li>
+</ul>
+<p>Here are two examples<a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a></p>
+<ul>
+<li>Bird style</li>
+</ul>
+<pre><code>In Bird-style you have to leave a blank before the code.
+ 
+&gt; fact :: Integer -&gt; Integer
+&gt; fact 0 = 1
+&gt; fact n = n * fact (n-1)
+ 
+And you have to leave a blank line after the code as well.</code></pre>
+<ul>
+<li>LaTeX style</li>
+</ul>
+<pre><code>In LaTeX style, the code snippet must be at the top indentation level
+or you will have an `unlit' error
+\begin{code}
+tsort []     = []
+tsort (x:xs) = tsort [y | y&lt;-xs, y&gt;x] ++ [x] ++ tsort [y | y&lt;-xs, y&lt;=x]
+\end{code}</code></pre>
+<p>It <a href="https://wiki.haskell.org/Literate_programming">seems</a> that the LaTeX style is more robust, so you should privilege it whenever possible.</p>
+<p>As to the non-code portions, Haskell is rather agnostic so you can write LaTeX, HTML or whatever you want. But be careful, however, if you write Markdown</p>
+<ul>
+<li>GHC is not happy with leading <code>#</code> which indicates heading in Markdown. As a workaround, you can use <code>---</code> or <code>===</code> <strong>below</strong> the line of interest.</li>
+<li><code>&gt;</code> signifies quotation in Markdown.</li>
+</ul>
+<h3 id="write-slides-with-literate-haskell">Write slides with literate Haskell</h3>
+<p>Since in literate Haskell we have very few restraints on writing non-code text, we can actually write slides!</p>
+<h4 id="javascript-based-approach">Javascript-based approach</h4>
+<p>A number of Javascript based libraries such as <a href="https://revealjs.com/">reveal.js</a> make it possible to produce attractive slides with HTML or Markdown sources. However, it is not easy (if possible at all) to write a literate Haskell which gets highlighted correctly in the rendered HTML output. It is even more difficult to hide valid code in the slides or hide invalid code from Haskell.</p>
+<p>One possible solution is to use <a href="https://pandoc.org/">Pandoc</a> as a middleware when render the HTML. For example, it <a href="https://github.com/jgm/pandoc/wiki/Using-pandoc-to-produce-reveal.js-slides">can output <code>reveal.js</code> HTML from Markdown source</a>. However, since we cannot use <code>#</code>, <code>##</code> to mark levels, the output HTMLs have very shallow structure.</p>
+<h4 id="latex-beamer">LaTeX beamer</h4>
+<p>The best solution I found is to simply use LaTeX <a href="https://ctan.org/pkg/beamer">beamer</a>. For those who are not familiar with it, it is a LaTeX package which are widely used to produce academic slides. Since literate Haskell supports LaTeX mode, we have <strong>full</strong> control over the output slides.</p>
+<p>Only a few pitfalls here</p>
+<ul>
+<li>the file must have <code>.lhs</code> extension</li>
+<li>when producing slides it must be compile with <code>-shell-escape</code> option</li>
+<li><code>frame</code> must use <code>fragile</code> mode</li>
+<li><code>\begin{code}</code> and <code>\end{code}</code> must be at the top indentation level</li>
+</ul>
+<p>Here is a minimalist template</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode latex"><code class="sourceCode latex"><a class="sourceLine" id="cb3-1" title="1"><span class="co">% filename: main.lhs</span></a>
+<a class="sourceLine" id="cb3-2" title="2"><span class="bu">\documentclass</span>{<span class="ex">beamer</span>}</a>
+<a class="sourceLine" id="cb3-3" title="3"></a>
+<a class="sourceLine" id="cb3-4" title="4"><span class="bu">\usepackage</span>{<span class="ex">minted</span>}</a>
+<a class="sourceLine" id="cb3-5" title="5"><span class="fu">\newenvironment</span>{code}{<span class="fu">\VerbatimEnvironment</span><span class="kw">\begin</span>{<span class="ex">minted</span>}{haskell}}{\end{minted}}</a>
+<a class="sourceLine" id="cb3-6" title="6"><span class="vs">\newenvironment{spec}{\VerbatimEnvironment\begin{minted}{haskell}}{</span><span class="kw">\end</span>{<span class="ex">minted</span>}}</a>
+<a class="sourceLine" id="cb3-7" title="7"></a>
+<a class="sourceLine" id="cb3-8" title="8"><span class="fu">\newenvironment</span>{slide}[1]</a>
+<a class="sourceLine" id="cb3-9" title="9">  {<span class="kw">\begin</span>{<span class="ex">frame</span>}[fragile,environment=slide]{#1}}</a>
+<a class="sourceLine" id="cb3-10" title="10">  {<span class="kw">\end</span>{<span class="ex">frame</span>}}</a>
+<a class="sourceLine" id="cb3-11" title="11"><span class="fu">\long\def</span>\ignore#1{}</a>
+<a class="sourceLine" id="cb3-12" title="12"></a>
+<a class="sourceLine" id="cb3-13" title="13"><span class="fu">\title</span>{Title}</a>
+<a class="sourceLine" id="cb3-14" title="14"><span class="fu">\subtitle</span>{Subtitle}</a>
+<a class="sourceLine" id="cb3-15" title="15"><span class="fu">\author</span>{Author}</a>
+<a class="sourceLine" id="cb3-16" title="16"><span class="fu">\date</span>{<span class="fu">\today</span>}</a>
+<a class="sourceLine" id="cb3-17" title="17"></a>
+<a class="sourceLine" id="cb3-18" title="18"><span class="kw">\begin</span>{<span class="ex">document</span>}</a>
+<a class="sourceLine" id="cb3-19" title="19"></a>
+<a class="sourceLine" id="cb3-20" title="20"><span class="kw">\begin</span>{<span class="ex">slide</span>}{Example}</a>
+<a class="sourceLine" id="cb3-21" title="21">This appear both in slides and Haskell</a>
+<a class="sourceLine" id="cb3-22" title="22"><span class="kw">\begin</span>{<span class="ex">code</span>}</a>
+<a class="sourceLine" id="cb3-23" title="23">add :: Integer -&gt; Integer -&gt; Integer</a>
+<a class="sourceLine" id="cb3-24" title="24">add x y =  x + y</a>
+<a class="sourceLine" id="cb3-25" title="25"><span class="kw">\end</span>{<span class="ex">code</span>}</a>
+<a class="sourceLine" id="cb3-26" title="26">This only appear in slides</a>
+<a class="sourceLine" id="cb3-27" title="27"><span class="kw">\begin</span>{<span class="ex">spec</span>}</a>
+<a class="sourceLine" id="cb3-28" title="28">-- broken code</a>
+<a class="sourceLine" id="cb3-29" title="29">foo :: String</a>
+<a class="sourceLine" id="cb3-30" title="30">foo = bar</a>
+<a class="sourceLine" id="cb3-31" title="31"><span class="kw">\end</span>{<span class="ex">spec</span>}</a>
+<a class="sourceLine" id="cb3-32" title="32">And this only appear in Haskell</a>
+<a class="sourceLine" id="cb3-33" title="33"><span class="fu">\ignore</span>{</a>
+<a class="sourceLine" id="cb3-34" title="34"><span class="kw">\begin</span>{<span class="ex">code</span>}</a>
+<a class="sourceLine" id="cb3-35" title="35">module Main where</a>
+<a class="sourceLine" id="cb3-36" title="36"></a>
+<a class="sourceLine" id="cb3-37" title="37">import Control.Applicative</a>
+<a class="sourceLine" id="cb3-38" title="38"><span class="kw">\end</span>{<span class="ex">code</span>}</a>
+<a class="sourceLine" id="cb3-39" title="39">}</a>
+<a class="sourceLine" id="cb3-40" title="40"><span class="kw">\end</span>{<span class="ex">slide</span>}</a>
+<a class="sourceLine" id="cb3-41" title="41"></a>
+<a class="sourceLine" id="cb3-42" title="42"><span class="kw">\end</span>{<span class="ex">document</span>}</a></code></pre></div>
+<section class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Knuth wrote the TeX engine, which powers document preparation systems like LaTeX, XeLaTeX and many more, in literate Pascal called <a href="https://en.wikipedia.org/wiki/WEB">WEB</a>.<a href="#fnref1" class="footnote-back">↩</a></p></li>
+<li id="fn2"><p>If you prefer using <a href="https://www.r-project.org/about.html">R</a>, <a href="https://rmarkdown.rstudio.com/r_notebooks">R Notebook</a> looks great too.<a href="#fnref2" class="footnote-back">↩</a></p></li>
+<li id="fn3"><p>It is not recommended to mix these two styles, otherwise you will get some mysterious parse errors.<a href="#fnref3" class="footnote-back">↩</a></p></li>
+</ol>
+</section>
+
+<div id="disqus_thread"></div>
+<script>
+
+/**
+*  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+*  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+var disqus_config = function () {
+this.page.url = "https://boeingx.github.io/posts/2018-11-15-write-slides-with-literate-haskell-and-latex-beamer.html";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = this.page.url; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+};
+(function() { // DON'T EDIT BELOW THIS LINE
+var d = document, s = d.createElement('script');
+s.src = 'https://boeingx.disqus.com/embed.js';
+s.setAttribute('data-timestamp', +new Date());
+(d.head || d.body).appendChild(s);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+
+    <div style="clear: both"></div>
+
+    <div id="footer">
+        Site proudly generated by
+        <a href="https://jaspervdj.be/hakyll">Hakyll</a>.
+        The source code of this website is
+        <a href="https://github.com/BoeingX/boeingx.github.io">
+        available on github</a>.
+    </div>
+</div>
+
+    </body>
+</html>

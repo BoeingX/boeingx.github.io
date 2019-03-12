@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-73013152-3"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'UA-73013152-3');
+        </script>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+
+        <title>BoeingX - Molecule to atoms</title>
+
+        <!-- Stylesheets. -->
+        <link rel="stylesheet" type="text/css" href="../style.css" />
+
+        <!-- Metadata. -->
+        <meta name="keywords" content="Baoyang SONG,boeingx,blog,programming,coding,haskell,function,personal,homepage" />
+        <meta name="description" content="Personal home page and blog of BoeingX." />
+    </head>
+    <body>
+        <div id="navigation">
+            <h1>Codopia</h1>
+            <a href="../">Home</a>
+            <a href="../posts.html">Archive</a>
+            <a href="../contact.html">Contact</a>
+            <h1>Links</h1>
+            <a href="https://github.com/BoeingX">GitHub</a>
+            <a href="https://www.linkedin.com/in/baoyang-song">LinkedIn</a>
+        </div>
+
+        <div id="content">
+    <h1>Molecule to atoms</h1>
+<div class="soft">
+    <em> Parse chemical formula with parser combinators as well as Alex and Happy</em>
+    <br />
+    <br />
+    Published on March  1, 2019 under the tag <a href="../tags/haskell.html">haskell</a>, <a href="../tags/parsing.html">parsing</a>, <a href="../tags/Alex.html">Alex</a>, <a href="../tags/Happy.html">Happy</a>
+</div>
+
+<p><a href="https://www.codewars.com">Codewars</a> has a very interesting <a href="https://www.codewars.com/kata/molecule-to-atoms">problem</a>:</p>
+<blockquote>
+<p>For a given chemical formula represented by a string, count the number of atoms of each element contained in the molecule and return an object <code>Either String [(String, Int)]</code>.</p>
+</blockquote>
+<p>For example,</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" title="1"><span class="fu">&gt;&gt;&gt;</span> parseMolecule <span class="st">&quot;H2O&quot;</span> <span class="co">-- water</span></a>
+<a class="sourceLine" id="cb1-2" title="2"><span class="dt">Right</span> [(<span class="st">&quot;H&quot;</span>,<span class="dv">2</span>),(<span class="st">&quot;O&quot;</span>,<span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb1-3" title="3"></a>
+<a class="sourceLine" id="cb1-4" title="4"><span class="fu">&gt;&gt;&gt;</span> parseMolecule <span class="st">&quot;Mg(OH)2&quot;</span> <span class="co">-- magnesium hydroxide</span></a>
+<a class="sourceLine" id="cb1-5" title="5"><span class="dt">Right</span> [(<span class="st">&quot;Mg&quot;</span>,<span class="dv">1</span>),(<span class="st">&quot;O&quot;</span>,<span class="dv">2</span>),(<span class="st">&quot;H&quot;</span>,<span class="dv">2</span>)]</a>
+<a class="sourceLine" id="cb1-6" title="6"></a>
+<a class="sourceLine" id="cb1-7" title="7"><span class="fu">&gt;&gt;&gt;</span> parseMolecule <span class="st">&quot;K4[ON(SO3)2]2&quot;</span> <span class="co">-- Fremy's salt</span></a>
+<a class="sourceLine" id="cb1-8" title="8"><span class="dt">Right</span> [(<span class="st">&quot;K&quot;</span>,<span class="dv">4</span>),(<span class="st">&quot;O&quot;</span>,<span class="dv">14</span>),(<span class="st">&quot;N&quot;</span>,<span class="dv">2</span>),(<span class="st">&quot;S&quot;</span>,<span class="dv">4</span>)]</a>
+<a class="sourceLine" id="cb1-9" title="9"></a>
+<a class="sourceLine" id="cb1-10" title="10"><span class="fu">&gt;&gt;&gt;</span> parseMolecule <span class="st">&quot;pie&quot;</span></a>
+<a class="sourceLine" id="cb1-11" title="11"><span class="dt">Left</span> <span class="st">&quot;Not a valid molecule&quot;</span></a></code></pre></div>
+<p>This is actually a parsing problem. Traditionally, parsing is considered as<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a> the <em>front-end</em> phase of a compiler which consists of two phases: lexical analysis and syntax analysis: lexical analysis takes a string a input and outputs a list of tokens (strings with an assigned and thus identified meaning); syntax analysis then consumes list of tokens and builds a data structure.</p>
+<p>Haskell is particular suitable for building parsers. Indeed, its <a href="https://wiki.haskell.org/Abstract_data_type">abstract data type</a> is just <strong>the</strong> right representation of abstract syntax tree (AST), a common data structure produced by syntax analysis.</p>
+<p>A typical Haskell parser is created by either parser combinators or Alex and Happy. A parser combinator is a higher-order function that accepts several parsers as input and returns a new parser as its output. It generally perform the lexical analysis and syntax analysis in one shot. Many libraries in Haskell help to create parser combinators, such as</p>
+<ul>
+<li><a href="https://hackage.haskell.org/package/base-4.9.0.0/docs/Text-ParserCombinators-ReadP.html">ReadP</a> (built-in in base)</li>
+<li><a href="https://hackage.haskell.org/package/parsec">Parsec</a></li>
+<li><a href="https://hackage.haskell.org/package/parsec">Attoparsec</a></li>
+<li><a href="https://hackage.haskell.org/package/megaparsec">Megaparsec</a></li>
+<li><a href="https://hackage.haskell.org/package/trifecta">Trifecta</a></li>
+</ul>
+<p><a href="https://hackage.haskell.org/package/alex">Alex</a> and <a href="https://hackage.haskell.org/package/happy">Happy</a>, on the other hand, are responsible for lexical and syntax analysis respectively. The are the Haskell equivalent of the famous <a href="https://en.wikipedia.org/wiki/Lex_(software)">Lex</a> and <a href="https://en.wikipedia.org/wiki/Yacc">Yacc</a> tool chain.</p>
+<p>The molecule parsing problem is simple enough that we are going to explore the two approaches in this post.</p>
+<p>For the rest of the post, we are going to use the following helper functions</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" title="1"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Map</span> <span class="kw">as</span> <span class="dt">M</span></a>
+<a class="sourceLine" id="cb2-2" title="2"></a>
+<a class="sourceLine" id="cb2-3" title="3"><span class="co">-- Composition is a count of atoms</span></a>
+<a class="sourceLine" id="cb2-4" title="4"><span class="kw">type</span> <span class="dt">Atom</span> <span class="fu">=</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb2-5" title="5"><span class="kw">type</span> <span class="dt">Composition</span> <span class="fu">=</span> <span class="dt">M.Map</span> <span class="dt">Atom</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb2-6" title="6"></a>
+<a class="sourceLine" id="cb2-7" title="7"><span class="co">-- Multiply a composition by index</span></a>
+<a class="sourceLine" id="cb2-8" title="8"><span class="ot">mul ::</span> <span class="dt">Index</span> <span class="ot">-&gt;</span> <span class="dt">Composition</span> <span class="ot">-&gt;</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb2-9" title="9">mul <span class="dt">One</span> <span class="fu">=</span> <span class="fu">id</span></a>
+<a class="sourceLine" id="cb2-10" title="10">mul (<span class="dt">Mul</span> n) <span class="fu">=</span> M.map (n <span class="fu">*</span>)</a>
+<a class="sourceLine" id="cb2-11" title="11"></a>
+<a class="sourceLine" id="cb2-12" title="12"><span class="co">-- Merge two compositions</span></a>
+<a class="sourceLine" id="cb2-13" title="13"><span class="ot">merge ::</span> <span class="dt">Composition</span> <span class="ot">-&gt;</span> <span class="dt">Composition</span> <span class="ot">-&gt;</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb2-14" title="14">merge <span class="fu">=</span> M.unionWith (<span class="fu">+</span>)</a></code></pre></div>
+<h2 id="approach-with-parser-combinators">Approach with parser combinators</h2>
+<blockquote>
+<p>TL; DR: See <a href="https://github.com/BoeingX/codewars/blob/master/src/MoleculeToAtoms.hs">here</a></p>
+</blockquote>
+<p>In this post we use ReadP, which is available by default in a standard GHC installation, to build our parser. One can easily port the implementation to more advanced tools like Parsec with very few modifications.</p>
+<p><code>ReadP</code> is defined in <code>Text.ParserCombinators.ReadP</code>. It should be considered abstract and we should not worry about its implementation in most cases. The <code>ReadS</code> type, defined in the same module, is actually what we could call a parser</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" title="1"><span class="kw">type</span> <span class="dt">ReadS</span> a <span class="fu">=</span> <span class="dt">String</span> <span class="ot">-&gt;</span> [(a, <span class="dt">String</span>)]</a></code></pre></div>
+<p>In plain words, a <code>ReadS</code> parser for type <code>a</code> takes a string and returns a list<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a> of possible parses as tuples where the first component is what is recognized as type <code>a</code>, whereas the second component is whatever is left of the string that the parser doesn’t consume to produce the value of type <code>a</code>.</p>
+<p>There is a function <code>readP_to_S</code> turns a ReadP-style parser to a (ReadS-style) parser</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb5-1" title="1"><span class="ot">readP_to_S ::</span> <span class="dt">ReadP</span> a <span class="ot">-&gt;</span> <span class="dt">ReadS</span> a</a></code></pre></div>
+<p>This is the main way in which you can “run” a ReadP parser.</p>
+<p>A bunch of parsers are defined in <code>Text.ParserCombinators.ReadP</code><a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a>, such as</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb6-1" title="1"><span class="co">-- Succeeds iff we are at the end of input</span></a>
+<a class="sourceLine" id="cb6-2" title="2"><span class="ot">eof ::</span> <span class="dt">ReadP</span> ()</a>
+<a class="sourceLine" id="cb6-3" title="3"></a>
+<a class="sourceLine" id="cb6-4" title="4"><span class="co">-- Parses and returns the specified character.</span></a>
+<a class="sourceLine" id="cb6-5" title="5"><span class="ot">char ::</span> <span class="dt">Char</span> <span class="ot">-&gt;</span> <span class="dt">ReadP</span> <span class="dt">Char</span></a>
+<a class="sourceLine" id="cb6-6" title="6"></a>
+<a class="sourceLine" id="cb6-7" title="7"><span class="co">-- Parses and returns the specified string.</span></a>
+<a class="sourceLine" id="cb6-8" title="8"><span class="ot">string ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">ReadP</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb6-9" title="9"></a>
+<a class="sourceLine" id="cb6-10" title="10"><span class="co">-- Combines all parsers in the specified list.</span></a>
+<a class="sourceLine" id="cb6-11" title="11"><span class="ot">choice ::</span> [<span class="dt">ReadP</span> a] <span class="ot">-&gt;</span> <span class="dt">ReadP</span> a </a>
+<a class="sourceLine" id="cb6-12" title="12"></a>
+<a class="sourceLine" id="cb6-13" title="13"><span class="co">-- option x p will either parse p or return x without consuming any input.</span></a>
+<a class="sourceLine" id="cb6-14" title="14"><span class="ot">option ::</span> a <span class="ot">-&gt;</span> <span class="dt">ReadP</span> a <span class="ot">-&gt;</span> <span class="dt">ReadP</span> a </a>
+<a class="sourceLine" id="cb6-15" title="15"></a>
+<a class="sourceLine" id="cb6-16" title="16"><span class="co">-- between open close p parses open, followed by p and finally close.</span></a>
+<a class="sourceLine" id="cb6-17" title="17"><span class="co">-- Only the value of p is returned.</span></a>
+<a class="sourceLine" id="cb6-18" title="18"><span class="ot">between ::</span> <span class="dt">ReadP</span> open <span class="ot">-&gt;</span> <span class="dt">ReadP</span> close <span class="ot">-&gt;</span> <span class="dt">ReadP</span> a <span class="ot">-&gt;</span> <span class="dt">ReadP</span> a</a>
+<a class="sourceLine" id="cb6-19" title="19"></a>
+<a class="sourceLine" id="cb6-20" title="20"><span class="co">-- Parses one or more occurrences of the given parser.</span></a>
+<a class="sourceLine" id="cb6-21" title="21"><span class="ot">many1 ::</span> <span class="dt">ReadP</span> a <span class="ot">-&gt;</span> <span class="dt">ReadP</span> [a] </a></code></pre></div>
+<p>We can easily build complex parsers with these smaller ones. In particular, these are all we need to parse our molecule to atoms problem.</p>
+<h3 id="attack-the-problem">Attack the problem</h3>
+<p>The difficulties of our problems are - indices are optional - the presence of brackets makes the formula recursive by nature</p>
+<p>With parser combinators, however, <code>optional</code> and <code>between</code> make it very easy to solve the two problems.</p>
+<p>First, we need some helper functions</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb7-1" title="1"><span class="co">-- | Parse an integer</span></a>
+<a class="sourceLine" id="cb7-2" title="2"><span class="ot">integer ::</span> <span class="dt">ReadP</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb7-3" title="3">integer <span class="fu">=</span> <span class="fu">read</span> <span class="fu">&lt;$&gt;</span> many1 (choice (<span class="fu">map</span> char <span class="st">&quot;0123456789&quot;</span>))</a>
+<a class="sourceLine" id="cb7-4" title="4"></a>
+<a class="sourceLine" id="cb7-5" title="5"><span class="ot">atoms ::</span> [<span class="dt">Atom</span>]</a>
+<a class="sourceLine" id="cb7-6" title="6">atoms <span class="fu">=</span> [<span class="st">&quot;H&quot;</span>,<span class="st">&quot;He&quot;</span>,<span class="st">&quot;Li&quot;</span>,<span class="st">&quot;Be&quot;</span>,<span class="st">&quot;B&quot;</span>,<span class="st">&quot;C&quot;</span>,<span class="st">&quot;N&quot;</span>,<span class="st">&quot;O&quot;</span>,<span class="st">&quot;F&quot;</span>,<span class="st">&quot;Ne&quot;</span>,<span class="st">&quot;Na&quot;</span>,<span class="st">&quot;Mg&quot;</span>,<span class="st">&quot;Al&quot;</span>,<span class="st">&quot;Si&quot;</span>,<span class="st">&quot;P&quot;</span>,<span class="st">&quot;S&quot;</span>,<span class="st">&quot;Cl&quot;</span>,<span class="st">&quot;Ar&quot;</span>,<span class="st">&quot;K&quot;</span>,<span class="st">&quot;Ca&quot;</span>,<span class="st">&quot;Sc&quot;</span>,<span class="st">&quot;Ti&quot;</span>,<span class="st">&quot;V&quot;</span>,<span class="st">&quot;Cr&quot;</span>,<span class="st">&quot;Mn&quot;</span>,<span class="st">&quot;Fe&quot;</span>,<span class="st">&quot;Co&quot;</span>,<span class="st">&quot;Ni&quot;</span>,<span class="st">&quot;Cu&quot;</span>,<span class="st">&quot;Zn&quot;</span>,<span class="st">&quot;Ga&quot;</span>,<span class="st">&quot;Ge&quot;</span>,<span class="st">&quot;As&quot;</span>,<span class="st">&quot;Se&quot;</span>,<span class="st">&quot;Br&quot;</span>,<span class="st">&quot;Kr&quot;</span>,<span class="st">&quot;Rb&quot;</span>,<span class="st">&quot;Sr&quot;</span>,<span class="st">&quot;Y&quot;</span>,<span class="st">&quot;Zr&quot;</span>,<span class="st">&quot;Nb&quot;</span>,<span class="st">&quot;Mo&quot;</span>,<span class="st">&quot;Tc&quot;</span>,<span class="st">&quot;Ru&quot;</span>,<span class="st">&quot;Rh&quot;</span>,<span class="st">&quot;Pd&quot;</span>,<span class="st">&quot;Ag&quot;</span>,<span class="st">&quot;Cd&quot;</span>,<span class="st">&quot;In&quot;</span>,<span class="st">&quot;Sn&quot;</span>,<span class="st">&quot;Sb&quot;</span>,<span class="st">&quot;Te&quot;</span>,<span class="st">&quot;I&quot;</span>,<span class="st">&quot;Xe&quot;</span>,<span class="st">&quot;Cs&quot;</span>,<span class="st">&quot;Ba&quot;</span>,<span class="st">&quot;La&quot;</span>,<span class="st">&quot;Ce&quot;</span>,<span class="st">&quot;Pr&quot;</span>,<span class="st">&quot;Nd&quot;</span>,<span class="st">&quot;Pm&quot;</span>,<span class="st">&quot;Sm&quot;</span>,<span class="st">&quot;Eu&quot;</span>,<span class="st">&quot;Gd&quot;</span>,<span class="st">&quot;Tb&quot;</span>,<span class="st">&quot;Dy&quot;</span>,<span class="st">&quot;Ho&quot;</span>,<span class="st">&quot;Er&quot;</span>,<span class="st">&quot;Tm&quot;</span>,<span class="st">&quot;Yb&quot;</span>,<span class="st">&quot;Lu&quot;</span>,<span class="st">&quot;Hf&quot;</span>,<span class="st">&quot;Ta&quot;</span>,<span class="st">&quot;W&quot;</span>,<span class="st">&quot;Re&quot;</span>,<span class="st">&quot;Os&quot;</span>,<span class="st">&quot;Ir&quot;</span>,<span class="st">&quot;Pt&quot;</span>,<span class="st">&quot;Au&quot;</span>,<span class="st">&quot;Hg&quot;</span>,<span class="st">&quot;Tl&quot;</span>,<span class="st">&quot;Pb&quot;</span>,<span class="st">&quot;Bi&quot;</span>,<span class="st">&quot;Po&quot;</span>,<span class="st">&quot;At&quot;</span>,<span class="st">&quot;Rn&quot;</span>,<span class="st">&quot;Fr&quot;</span>,<span class="st">&quot;Ra&quot;</span>,<span class="st">&quot;Ac&quot;</span>,<span class="st">&quot;Th&quot;</span>,<span class="st">&quot;Pa&quot;</span>,<span class="st">&quot;U&quot;</span>,<span class="st">&quot;Np&quot;</span>,<span class="st">&quot;Pu&quot;</span>,<span class="st">&quot;Am&quot;</span>,<span class="st">&quot;Cm&quot;</span>,<span class="st">&quot;Bk&quot;</span>,<span class="st">&quot;Cf&quot;</span>,<span class="st">&quot;Es&quot;</span>,<span class="st">&quot;Fm&quot;</span>,<span class="st">&quot;Md&quot;</span>,<span class="st">&quot;No&quot;</span>,<span class="st">&quot;Lr&quot;</span>,<span class="st">&quot;Rf&quot;</span>,<span class="st">&quot;Db&quot;</span>,<span class="st">&quot;Sg&quot;</span>,<span class="st">&quot;Bh&quot;</span>,<span class="st">&quot;Hs&quot;</span>,<span class="st">&quot;Mt&quot;</span>,<span class="st">&quot;Ds&quot;</span>,<span class="st">&quot;Rg&quot;</span>,<span class="st">&quot;Cn&quot;</span>,<span class="st">&quot;Nh&quot;</span>,<span class="st">&quot;Fl&quot;</span>,<span class="st">&quot;Mc&quot;</span>,<span class="st">&quot;Lv&quot;</span>,<span class="st">&quot;Ts&quot;</span>,<span class="st">&quot;Og&quot;</span>]</a></code></pre></div>
+<p>Then to parse a single atom, we can write</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb8-1" title="1"><span class="ot">parseAtom ::</span> <span class="dt">ReadP</span> <span class="dt">Atom</span></a>
+<a class="sourceLine" id="cb8-2" title="2">parseAtom <span class="fu">=</span> choice (<span class="fu">map</span> string atoms)</a></code></pre></div>
+<p>It is simple to add support for an optional index</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb9-1" title="1"><span class="ot">parseSingleton ::</span> <span class="dt">ReadP</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb9-2" title="2">parseSingleton <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb9-3" title="3">    atom <span class="ot">&lt;-</span> parseAtom <span class="co">-- read an atom</span></a>
+<a class="sourceLine" id="cb9-4" title="4">    <span class="fu">index</span> <span class="ot">&lt;-</span> option <span class="dv">1</span> integer <span class="co">-- read an index (default to 1)</span></a>
+<a class="sourceLine" id="cb9-5" title="5">    <span class="fu">return</span> <span class="fu">$</span> mul <span class="fu">index</span> (M.fromList [(atom, <span class="dv">1</span>)])</a></code></pre></div>
+<p>Now we try to parse formula between brackets</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb10-1" title="1"><span class="kw">type</span> <span class="dt">OpenBracket</span>  <span class="fu">=</span> <span class="dt">Char</span></a>
+<a class="sourceLine" id="cb10-2" title="2"><span class="kw">type</span> <span class="dt">CloseBracket</span> <span class="fu">=</span> <span class="dt">Char</span></a>
+<a class="sourceLine" id="cb10-3" title="3"></a>
+<a class="sourceLine" id="cb10-4" title="4"><span class="co">-- | Parse molecule between an open and close bracket</span></a>
+<a class="sourceLine" id="cb10-5" title="5"><span class="ot">parseBracket ::</span> <span class="dt">OpenBracket</span> <span class="ot">-&gt;</span> <span class="dt">CloseBracket</span> <span class="ot">-&gt;</span> <span class="dt">ReadP</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb10-6" title="6">parseBracket open close <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb10-7" title="7">    subMolecule <span class="ot">&lt;-</span> between (char open) (char close) parse</a>
+<a class="sourceLine" id="cb10-8" title="8">    <span class="fu">index</span> <span class="ot">&lt;-</span> option <span class="dv">1</span> integer</a>
+<a class="sourceLine" id="cb10-9" title="9">    <span class="fu">return</span> <span class="fu">$</span> mul <span class="fu">index</span> subMolecule</a>
+<a class="sourceLine" id="cb10-10" title="10"></a>
+<a class="sourceLine" id="cb10-11" title="11"><span class="co">-- | Only parentheses, bracket and brace are valid</span></a>
+<a class="sourceLine" id="cb10-12" title="12"><span class="ot">parseSubMolecule ::</span> <span class="dt">ReadP</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb10-13" title="13">parseSubMolecule <span class="fu">=</span> choice <span class="fu">$</span> <span class="fu">map</span> (<span class="fu">uncurry</span> parseBracket) [(<span class="ch">'('</span>, <span class="ch">')'</span>), (<span class="ch">'['</span>, <span class="ch">']'</span>), (<span class="ch">'{'</span>, <span class="ch">'}'</span>)]</a></code></pre></div>
+<p>To parse a molecule formula to atoms composition, we repeat one or more times (using <code>many1</code>) <code>parseSingleton</code> or (using <code>+++</code>) <code>parseSubMolecule</code>, which results a list of type <code>[Composition]</code>. Then we use <code>merge :: Composition -&gt; Composition</code> to reduce them to a single <code>Composition</code></p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb11-1" title="1"><span class="ot">parse ::</span> <span class="dt">ReadP</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb11-2" title="2">parse <span class="fu">=</span> <span class="fu">foldr</span> merge M.empty <span class="fu">&lt;$&gt;</span> many1 (parseSingleton <span class="fu">+++</span> parseSubMolecule)</a></code></pre></div>
+<p>Finally, we wrap <code>parse</code> in a function with the required type signature</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb12-1" title="1"><span class="ot">parseMolecule ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Either</span> <span class="dt">String</span> [(<span class="dt">String</span>,<span class="dt">Int</span>)]</a>
+<a class="sourceLine" id="cb12-2" title="2">parseMolecule formula <span class="fu">=</span> <span class="kw">case</span> readP_to_S (parse <span class="fu">&lt;*</span> eof) formula <span class="kw">of</span></a>
+<a class="sourceLine" id="cb12-3" title="3">    [] <span class="ot">-&gt;</span> <span class="dt">Left</span> <span class="st">&quot;Not a valid molecule&quot;</span></a>
+<a class="sourceLine" id="cb12-4" title="4">    [(x, <span class="st">&quot;&quot;</span>)] <span class="ot">-&gt;</span> <span class="dt">Right</span> (M.toList x)</a>
+<a class="sourceLine" id="cb12-5" title="5">    _ <span class="ot">-&gt;</span> <span class="fu">undefined</span> <span class="co">-- this will not happen</span></a></code></pre></div>
+<h2 id="approach-with-alex-and-happy">Approach with Alex and Happy</h2>
+<blockquote>
+<p>TL;DR: see <a href="https://github.com/BoeingX/codewars/tree/master/src/MoleculeToAtomsWithAlexHappy">here</a></p>
+</blockquote>
+<h3 id="alex">Alex</h3>
+<p>Alex takes a description of tokens to be recognised in the form of regular expressions and <strong>generates</strong> a Haskell lexical analyser.</p>
+<p>For our problem, the lexer could be as follows</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb13-1" title="1">{</a>
+<a class="sourceLine" id="cb13-2" title="2"><span class="kw">module</span> <span class="dt">Lexer</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb13-3" title="3">}</a>
+<a class="sourceLine" id="cb13-4" title="4"></a>
+<a class="sourceLine" id="cb13-5" title="5"><span class="fu">%</span>wrapper <span class="st">&quot;basic&quot;</span></a>
+<a class="sourceLine" id="cb13-6" title="6"></a>
+<a class="sourceLine" id="cb13-7" title="7">tokens <span class="fu">:-</span></a>
+<a class="sourceLine" id="cb13-8" title="8">    <span class="fu">$</span>white<span class="fu">+</span>         ;</a>
+<a class="sourceLine" id="cb13-9" title="9">    [<span class="dt">A</span><span class="fu">-</span><span class="dt">Z</span>][a<span class="fu">-</span>z]<span class="fu">?</span>     {\s <span class="ot">-&gt;</span> <span class="dt">TAtom</span> s}</a>
+<a class="sourceLine" id="cb13-10" title="10">    [<span class="dv">0</span><span class="fu">-</span><span class="dv">9</span>]<span class="fu">+</span>          {\s <span class="ot">-&gt;</span> <span class="dt">TIndex</span> (<span class="fu">read</span> s)}</a>
+<a class="sourceLine" id="cb13-11" title="11">    \(              {\s <span class="ot">-&gt;</span> <span class="dt">TLParen</span>}</a>
+<a class="sourceLine" id="cb13-12" title="12">    \)              {\s <span class="ot">-&gt;</span> <span class="dt">TRParen</span>}</a>
+<a class="sourceLine" id="cb13-13" title="13">    \[              {\s <span class="ot">-&gt;</span> <span class="dt">TLBracket</span>}</a>
+<a class="sourceLine" id="cb13-14" title="14">    \]              {\s <span class="ot">-&gt;</span> <span class="dt">TRBracket</span>}</a>
+<a class="sourceLine" id="cb13-15" title="15">    \{              {\s <span class="ot">-&gt;</span> <span class="dt">TLBrace</span>}</a>
+<a class="sourceLine" id="cb13-16" title="16">    \}              {\s <span class="ot">-&gt;</span> <span class="dt">TRBrace</span>}</a>
+<a class="sourceLine" id="cb13-17" title="17"></a>
+<a class="sourceLine" id="cb13-18" title="18">{</a>
+<a class="sourceLine" id="cb13-19" title="19"><span class="kw">data</span> <span class="dt">Token</span> <span class="fu">=</span> <span class="dt">TAtom</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb13-20" title="20">           <span class="fu">|</span> <span class="dt">TIndex</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb13-21" title="21">           <span class="fu">|</span> <span class="dt">TLParen</span></a>
+<a class="sourceLine" id="cb13-22" title="22">           <span class="fu">|</span> <span class="dt">TRParen</span></a>
+<a class="sourceLine" id="cb13-23" title="23">           <span class="fu">|</span> <span class="dt">TLBracket</span></a>
+<a class="sourceLine" id="cb13-24" title="24">           <span class="fu">|</span> <span class="dt">TRBracket</span></a>
+<a class="sourceLine" id="cb13-25" title="25">           <span class="fu">|</span> <span class="dt">TLBrace</span></a>
+<a class="sourceLine" id="cb13-26" title="26">           <span class="fu">|</span> <span class="dt">TRBrace</span></a>
+<a class="sourceLine" id="cb13-27" title="27">    <span class="kw">deriving</span> (<span class="dt">Eq</span>, <span class="dt">Show</span>)</a>
+<a class="sourceLine" id="cb13-28" title="28">}</a></code></pre></div>
+<p>In an Alex source file, any lines between <code>{</code> and <code>}</code> are copied directly to the generated Haskell code. <code>%wrapper &quot;basic&quot;</code> controls what kind of support code Alex should produce along with the basic scanner.</p>
+<p>The <code>tokens :-</code> line starts the definition of the scanner. The scanner is specified as a series of token definitions where each token specification takes the form of</p>
+<pre><code>regexp   { code }</code></pre>
+<p>The meaning of a this rule is <em>if the input matches <code>regexp</code>, then return <code>code</code></em>. <code>code</code> could be any Haskell function of type</p>
+<pre><code>f :: String -&gt; Token</code></pre>
+<p>When a token (for example, white space or comments) is to be ignored, the code part (along with the braces) can be replaced by <code>;</code>.</p>
+<p>Process<a href="#fn4" class="footnote-ref" id="fnref4"><sup>4</sup></a> this file (suppose name <code>Lexer.x</code>) with</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb17-1" title="1">alex Lexer.x</a></code></pre></div>
+<p>we get a Haskell module named <code>Lexer.hs</code> which exports a function</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb18-1" title="1"><span class="ot">alexScanTokens ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> [<span class="dt">Token</span>]</a></code></pre></div>
+<p>that we can use in other modules.</p>
+<h3 id="happy">Happy</h3>
+<p>Before showing how Happy works, let us first introduce <a href="https://en.wikipedia.org/wiki/Context-free_grammar">Context-free Grammar (CFG)</a>.</p>
+<p>Context-free grammar consists of a set of production rules that describe all possible strings in a given formal language. Production rules are simple replacements. Production rules whose right hand side is empty string is called <span class="math inline"><em>ϵ</em>−</span>production.</p>
+<p>For example, the context-free grammar</p>
+<pre><code>A -&gt; Ba
+B -&gt; A | epsilon</code></pre>
+<p>generates the language of zero or more <em>a</em>’s</p>
+<pre><code>{&quot;&quot;, &quot;a&quot;, &quot;aa&quot;, &quot;aaa&quot;, ...}</code></pre>
+<p>In the sense of context-free grammar, parsing a given string is to determine whether and <strong>how</strong> it can be generated from the grammar.</p>
+<p>Happy takes a file containing an annotated <a href="https://en.wikipedia.org/wiki/Backus%E2%80%93Naur_form">BNF specification</a> of a grammar and produces a Haskell module containing a parser for the grammar.</p>
+<p>It happens that many languages are context-free. In particular, the language of valid chemical formulas is context-free. Indeed, it can be described by the following CFG</p>
+<pre><code>Molecule -&gt; M
+          | MoleculeMolecule
+
+M        -&gt; Atom Index
+          | (Molecule)Index
+          | [Molecule]Index
+          | {Molecule}Index
+
+Index    -&gt; epsilon | int
+
+Atom     -&gt; &quot;H&quot; | &quot;He&quot; | ...</code></pre>
+<p>Now we translate the above grammar into a Happy grammar file. The file starts off like this</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb22-1" title="1">{</a>
+<a class="sourceLine" id="cb22-2" title="2"><span class="kw">module</span> <span class="dt">Grammar</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb22-3" title="3"></a>
+<a class="sourceLine" id="cb22-4" title="4"><span class="kw">import</span> <span class="dt">Lexer</span> (<span class="dt">Token</span>(..))</a>
+<a class="sourceLine" id="cb22-5" title="5">}</a></code></pre></div>
+<p>where we defined the name of the grammar module and import from the lexical analysis module the token data type and all its constructors.</p>
+<p>Next we make a couple of declarations</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb23-1" title="1"><span class="fu">%</span>name parse</a>
+<a class="sourceLine" id="cb23-2" title="2"><span class="fu">%</span>tokentype { <span class="dt">Token</span> }</a>
+<a class="sourceLine" id="cb23-3" title="3"><span class="fu">%error</span> { parseError }</a></code></pre></div>
+<p><code>%name parse</code> gives the name of the Haskell parser function. <code>%tokentype {Token}</code> declares the Haskell type of tokens that the parser will accept. The <code>%error</code> directive tells Happy the name of a function it should call in the event of a parse error.</p>
+<p>By default, with the above configuration the parser will be of type</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb24-1" title="1"><span class="ot">parse ::</span> [<span class="dt">Token</span>] <span class="ot">-&gt;</span> <span class="dt">T</span></a></code></pre></div>
+<p>where <code>T</code> is the return type of the parser determined by the production rules introduced later. However, if an error is encounter during passing, the program with crash with no error message. In most cases, this is not the desired behavior. Fortunately, Happy makes it easy to wrap the parser in a monad. By adding</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb25-1" title="1"><span class="fu">%</span>monad { <span class="dt">Either</span> <span class="dt">String</span> }</a></code></pre></div>
+<p>to the declarations, the parser function (and the parse error handling function) will have type</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb26-1" title="1"><span class="ot">parser ::</span> [<span class="dt">Token</span>] <span class="ot">-&gt;</span> <span class="dt">Either</span> <span class="dt">String</span> a</a></code></pre></div>
+<p>This way, we can not only wrap error messages in the <code>Either</code> monad, but also make the parser function have the required return type in the original problem.</p>
+<p>Now we declare all the possible tokens:</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb27-1" title="1"><span class="fu">%</span>token</a>
+<a class="sourceLine" id="cb27-2" title="2">    <span class="fu">index</span>           { <span class="dt">TIndex</span> <span class="fu">$$</span> } </a>
+<a class="sourceLine" id="cb27-3" title="3">    atom            { <span class="dt">TAtom</span> <span class="fu">$$</span> }</a>
+<a class="sourceLine" id="cb27-4" title="4">    <span class="ch">'('</span>             { <span class="dt">TLParen</span> }</a>
+<a class="sourceLine" id="cb27-5" title="5">    <span class="ch">')'</span>             { <span class="dt">TRParen</span> }</a>
+<a class="sourceLine" id="cb27-6" title="6">    <span class="ch">'['</span>             { <span class="dt">TLBracket</span> }</a>
+<a class="sourceLine" id="cb27-7" title="7">    <span class="ch">']'</span>             { <span class="dt">TRBracket</span> }</a>
+<a class="sourceLine" id="cb27-8" title="8">    <span class="ch">'{'</span>             { <span class="dt">TLBrace</span> }</a>
+<a class="sourceLine" id="cb27-9" title="9">    <span class="ch">'}'</span>             { <span class="dt">TRBrace</span> }</a>
+<a class="sourceLine" id="cb27-10" title="10"><span class="fu">%%</span></a></code></pre></div>
+<p>The symbols on the left are the tokens as they will be referred to in the rest of the grammar file, and to the right of each token enclosed in braces is a Haskell pattern that matches the token. The parser will expect to receive a stream of tokens, each of which will match one of the given patterns (the definition of the <code>Token</code> datatype is imported from the lexer module). The <code>$$</code> symbol is a placeholder that represents the value of this token.</p>
+<p>The translation of the CFG to Happy grammar is almost trivial</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb28-1" title="1"><span class="dt">Molecule</span> <span class="fu">:</span> <span class="dt">M</span>                 { <span class="dt">Molecule</span> <span class="fu">$</span><span class="dv">1</span> }</a>
+<a class="sourceLine" id="cb28-2" title="2">         <span class="fu">|</span> <span class="dt">Molecule</span> <span class="dt">Molecule</span> { <span class="dt">Compound</span> <span class="fu">$</span><span class="dv">1</span> <span class="fu">$</span><span class="dv">2</span> }</a>
+<a class="sourceLine" id="cb28-3" title="3"></a>
+<a class="sourceLine" id="cb28-4" title="4"><span class="dt">M</span> <span class="fu">:</span> atom <span class="dt">Index</span>              { <span class="dt">Singleton</span> <span class="fu">$</span><span class="dv">1</span> <span class="fu">$</span><span class="dv">2</span> }</a>
+<a class="sourceLine" id="cb28-5" title="5">  <span class="fu">|</span> <span class="ch">'('</span> <span class="dt">Molecule</span> <span class="ch">')'</span> <span class="dt">Index</span>  { <span class="dt">Multiply</span> <span class="fu">$</span><span class="dv">2</span> <span class="fu">$</span><span class="dv">4</span> }</a>
+<a class="sourceLine" id="cb28-6" title="6">  <span class="fu">|</span> <span class="ch">'['</span> <span class="dt">Molecule</span> <span class="ch">']'</span> <span class="dt">Index</span>  { <span class="dt">Multiply</span> <span class="fu">$</span><span class="dv">2</span> <span class="fu">$</span><span class="dv">4</span> }</a>
+<a class="sourceLine" id="cb28-7" title="7">  <span class="fu">|</span> <span class="ch">'{'</span> <span class="dt">Molecule</span> <span class="ch">'}'</span> <span class="dt">Index</span>  { <span class="dt">Multiply</span> <span class="fu">$</span><span class="dv">2</span> <span class="fu">$</span><span class="dv">4</span> }</a>
+<a class="sourceLine" id="cb28-8" title="8"></a>
+<a class="sourceLine" id="cb28-9" title="9"><span class="dt">Index</span> <span class="fu">:</span> <span class="co">{- empty -}</span> { <span class="dt">One</span> }</a>
+<a class="sourceLine" id="cb28-10" title="10">      <span class="fu">|</span> <span class="fu">index</span>       { <span class="dt">Mul</span> <span class="fu">$</span><span class="dv">1</span> } </a></code></pre></div>
+<p>Each production consists of a <strong>non-terminal</strong> symbol on the left, followed by a colon, followed by one or more expansions on the right, separated by <code>|</code>. Each expansion has some Haskell code associated with it, enclosed in braces as in Alex file. Note that in the Haskell code, we use <code>$1, $2</code> etc to refer to the symbols on the right of colon<a href="#fn5" class="footnote-ref" id="fnref5"><sup>5</sup></a>.</p>
+<p>Finally, defined the parse error handling function and declare the data type that represents the parsed expression</p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb30-1" title="1">{</a>
+<a class="sourceLine" id="cb30-2" title="2"><span class="ot">parseError ::</span> [<span class="dt">Token</span>] <span class="ot">-&gt;</span> <span class="dt">Either</span> <span class="dt">String</span> a</a>
+<a class="sourceLine" id="cb30-3" title="3">parseError _ <span class="fu">=</span> <span class="dt">Left</span> <span class="st">&quot;Not a valid molecule&quot;</span></a>
+<a class="sourceLine" id="cb30-4" title="4"></a>
+<a class="sourceLine" id="cb30-5" title="5"><span class="kw">type</span> <span class="dt">Atom</span> <span class="fu">=</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb30-6" title="6"></a>
+<a class="sourceLine" id="cb30-7" title="7"><span class="kw">data</span> <span class="dt">Molecule</span> <span class="fu">=</span> <span class="dt">Molecule</span> <span class="dt">M</span> </a>
+<a class="sourceLine" id="cb30-8" title="8">              <span class="fu">|</span> <span class="dt">Compound</span> <span class="dt">Molecule</span> <span class="dt">Molecule</span></a>
+<a class="sourceLine" id="cb30-9" title="9">    <span class="kw">deriving</span> (<span class="dt">Eq</span>, <span class="dt">Show</span>)</a>
+<a class="sourceLine" id="cb30-10" title="10"></a>
+<a class="sourceLine" id="cb30-11" title="11"><span class="kw">data</span> <span class="dt">M</span> <span class="fu">=</span> <span class="dt">Singleton</span> <span class="dt">Atom</span> <span class="dt">Index</span></a>
+<a class="sourceLine" id="cb30-12" title="12">       <span class="fu">|</span> <span class="dt">Multiply</span> <span class="dt">Molecule</span> <span class="dt">Index</span></a>
+<a class="sourceLine" id="cb30-13" title="13">    <span class="kw">deriving</span> (<span class="dt">Eq</span>, <span class="dt">Show</span>)</a>
+<a class="sourceLine" id="cb30-14" title="14"></a>
+<a class="sourceLine" id="cb30-15" title="15"><span class="kw">data</span> <span class="dt">Index</span> <span class="fu">=</span> <span class="dt">One</span> <span class="fu">|</span> <span class="dt">Mul</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb30-16" title="16">    <span class="kw">deriving</span> (<span class="dt">Eq</span>, <span class="dt">Show</span>)</a>
+<a class="sourceLine" id="cb30-17" title="17"></a>
+<a class="sourceLine" id="cb30-18" title="18">}</a></code></pre></div>
+<p>Process<a href="#fn6" class="footnote-ref" id="fnref6"><sup>6</sup></a> this file with Happy (suppose the filename is <code>Grammar.y</code>)</p>
+<div class="sourceCode" id="cb31"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb31-1" title="1"><span class="ex">happy</span> Grammar.y</a></code></pre></div>
+<p>an Haskell module named <code>Grammar.hs</code> will be generated which parses our CFG.</p>
+<h3 id="wrap">Wrap</h3>
+<p>Given the lexer and parser, let’s wrap everything into <code>parseMolecule</code> with required type</p>
+<div class="sourceCode" id="cb32"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb32-1" title="1"><span class="ot">evalM ::</span> <span class="dt">M</span> <span class="ot">-&gt;</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb32-2" title="2">evalM (<span class="dt">Singleton</span> s i) <span class="fu">=</span> mul i (M.fromList [(s, <span class="dv">1</span>)])</a>
+<a class="sourceLine" id="cb32-3" title="3">evalM (<span class="dt">Multiply</span> m i) <span class="fu">=</span> mul i (eval m)</a>
+<a class="sourceLine" id="cb32-4" title="4"></a>
+<a class="sourceLine" id="cb32-5" title="5"><span class="ot">eval ::</span> <span class="dt">Molecule</span> <span class="ot">-&gt;</span> <span class="dt">Composition</span></a>
+<a class="sourceLine" id="cb32-6" title="6">eval (<span class="dt">Molecule</span> m) <span class="fu">=</span> evalM m</a>
+<a class="sourceLine" id="cb32-7" title="7">eval (<span class="dt">Compound</span> m1 m2) <span class="fu">=</span> merge (eval m1) (eval m2)</a>
+<a class="sourceLine" id="cb32-8" title="8"></a>
+<a class="sourceLine" id="cb32-9" title="9"><span class="ot">parseMolecule ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Either</span> <span class="dt">String</span> [(<span class="dt">String</span>,<span class="dt">Int</span>)]</a>
+<a class="sourceLine" id="cb32-10" title="10">parseMolecule formula <span class="fu">=</span> M.toList <span class="fu">.</span> eval <span class="fu">&lt;$&gt;</span> parse (alexScanTokens formula)</a></code></pre></div>
+<h2 id="further-reading">Further reading</h2>
+<h3 id="parser-combinators">Parser combinators</h3>
+<ul>
+<li><a href="https://hackage.haskell.org/package/base-4.9.0.0/docs/Text-ParserCombinators-ReadP.html">ReadP documentation</a></li>
+<li>Haskell Programming from First Principles, the <a href="http://haskellbook.com/progress.html#parsers">Parsers chapter</a></li>
+</ul>
+<h3 id="alex-and-happy">Alex and Happy</h3>
+<ul>
+<li><a href="https://www.haskell.org/alex/doc/html/index.html">Alex documentation</a> and <a href="https://www.haskell.org/happy/doc/html/index.html">Happy documentation</a></li>
+<li>Stanford <a href="http://web.stanford.edu/class/cs143/">CS143 course</a> (a MOOC version is freely available as <a href="https://lagunita.stanford.edu/courses/Engineering/Compilers/Fall2014/about">CS1</a> on <a href="https://lagunita.stanford.edu/">Stanford Lagunita</a>)</li>
+</ul>
+<section class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p><a href="https://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools" class="uri">https://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools</a><a href="#fnref1" class="footnote-back">↩</a></p></li>
+<li id="fn2"><p>This is called a Hutton-Meijer parser. Modern Haskell parser combinators tend to use a less powerful (but more efficient) version</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" title="1"><span class="kw">type</span> <span class="dt">Parser</span> a <span class="fu">=</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Maybe</span> (a, <span class="dt">String</span>)</a></code></pre></div>
+<a href="#fnref2" class="footnote-back">↩</a></li>
+<li id="fn3"><p>These parsers are actually standard and you can find them in most parser combinator libraries.<a href="#fnref3" class="footnote-back">↩</a></p></li>
+<li id="fn4"><p>If you use the Stack tool, all you have to do is to add a <code>build-tools</code> session in <code>package.yaml</code></p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode yaml"><code class="sourceCode yaml"><a class="sourceLine" id="cb16-1" title="1"><span class="fu">build-tools:</span></a>
+<a class="sourceLine" id="cb16-2" title="2"><span class="kw">-</span> alex</a>
+<a class="sourceLine" id="cb16-3" title="3"><span class="kw">-</span> happy</a></code></pre></div>
+<p>and add <code>array</code> to <code>dependencies</code>. You are free to import <code>Lexer</code> throughout in the project even though only an Alex file exists. Stack will automatically detects the dependency and generate <code>Lexer.hs</code> before actually compiling the project.<a href="#fnref4" class="footnote-back">↩</a></p></li>
+<li id="fn5"><p>For example,</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb29-1" title="1"><span class="dt">M</span><span class="fu">:</span> <span class="ch">'('</span> <span class="dt">Molecule</span> <span class="ch">')'</span> <span class="dt">Index</span>  { <span class="dt">Multiply</span> <span class="fu">$</span><span class="dv">2</span> <span class="fu">$</span><span class="dv">4</span> }</a>
+<a class="sourceLine" id="cb29-2" title="2"><span class="co">--  $1    $2     $3   $4  </span></a></code></pre></div>
+<a href="#fnref5" class="footnote-back">↩</a></li>
+<li id="fn6"><p>Again, as with Alex, if you use the Stack tool, you are free to import <code>Grammar</code> throughout in the project even though only a Happy file exists. Stack will automatically detects the dependency and generate <code>Grammar.hs</code> before actually compiling the project.<a href="#fnref6" class="footnote-back">↩</a></p></li>
+</ol>
+</section>
+
+<div id="disqus_thread"></div>
+<script>
+
+/**
+*  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+*  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+var disqus_config = function () {
+this.page.url = "https://boeingx.github.io/posts/2019-03-01-molecule-to-atoms.html";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = this.page.url; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+};
+(function() { // DON'T EDIT BELOW THIS LINE
+var d = document, s = d.createElement('script');
+s.src = 'https://boeingx.disqus.com/embed.js';
+s.setAttribute('data-timestamp', +new Date());
+(d.head || d.body).appendChild(s);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+
+    <div style="clear: both"></div>
+
+    <div id="footer">
+        Site proudly generated by
+        <a href="https://jaspervdj.be/hakyll">Hakyll</a>.
+        The source code of this website is
+        <a href="https://github.com/BoeingX/boeingx.github.io">
+        available on github</a>.
+    </div>
+</div>
+
+    </body>
+</html>

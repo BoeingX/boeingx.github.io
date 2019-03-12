@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-73013152-3"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'UA-73013152-3');
+        </script>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+
+        <title>BoeingX - Read integers efficiently in Haskell</title>
+
+        <!-- Stylesheets. -->
+        <link rel="stylesheet" type="text/css" href="../style.css" />
+
+        <!-- Metadata. -->
+        <meta name="keywords" content="Baoyang SONG,boeingx,blog,programming,coding,haskell,function,personal,homepage" />
+        <meta name="description" content="Personal home page and blog of BoeingX." />
+    </head>
+    <body>
+        <div id="navigation">
+            <h1>Codopia</h1>
+            <a href="../">Home</a>
+            <a href="../posts.html">Archive</a>
+            <a href="../contact.html">Contact</a>
+            <h1>Links</h1>
+            <a href="https://github.com/BoeingX">GitHub</a>
+            <a href="https://www.linkedin.com/in/baoyang-song">LinkedIn</a>
+        </div>
+
+        <div id="content">
+    <h1>Read integers efficiently in Haskell</h1>
+<div class="soft">
+    <em> What is the best practice to read a list of numbers from standard input (or a file) in Haskell? This post will show you by conducting a series of benchmarks.</em>
+    <br />
+    <br />
+    Published on November  3, 2018 under the tag <a href="../tags/haskell.html">haskell</a>, <a href="../tags/performance.html">performance</a>
+</div>
+
+<h3 id="introduction">Introduction</h3>
+<blockquote>
+<p>TL;DR: See this <a href="https://gist.github.com/BoeingX/a4a67c03599c381d5f1371c1f073be39">GitHub gist</a></p>
+</blockquote>
+<p>Recently I participated in a <a href="https://www.codechef.com/snackdown">online programming contest</a>. Since I was learning and practicing Haskell for the last few months, I decided to solve the problems in Haskell.</p>
+<p>The contest uses a online judge (OJ) system to evaluate submitted solutions. A valid solution is supposed to read test data from standard input and print the answer to standard output. Sometimes, inputs are integer arrays of length <code>10^5</code>, and I got systematically TLE (Time Limit Exceeded) error with the OJ. Ironically, without changing the algorithm, recoding everything in Python always pass the tests :(.</p>
+<p>Certainly, the OJ uses <a href="https://blog.codechef.com/2009/04/01/announcing-time-limits-based-on-programming-language/">5x time limit</a> for solutions in Python. However, a closer investigation shows that the Haskell version is more than 5 times slower than the Python version: how could this be possible?</p>
+<p>To keep things simple, throughout this post we consider the simple problem</p>
+<blockquote>
+<p>Read a list of numbers from standard input and print the sum to standard output.</p>
+</blockquote>
+<p>Also, we use following Python script</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><a class="sourceLine" id="cb1-1" title="1"><span class="co"># filename: baseline.py</span></a>
+<a class="sourceLine" id="cb1-2" title="2"><span class="im">import</span> sys</a>
+<a class="sourceLine" id="cb1-3" title="3"></a>
+<a class="sourceLine" id="cb1-4" title="4"><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">'__main__'</span>:</a>
+<a class="sourceLine" id="cb1-5" title="5">    xs <span class="op">=</span> [<span class="bu">int</span>(x) <span class="cf">for</span> x <span class="kw">in</span> sys.stdin.readline().strip().split(<span class="st">' '</span>)]</a>
+<a class="sourceLine" id="cb1-6" title="6">    <span class="bu">print</span>(<span class="bu">sum</span>(xs))</a></code></pre></div>
+<p>and Haskell code[^numbers]</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" title="1"><span class="co">-- filename: Baseline.hs</span></a>
+<a class="sourceLine" id="cb2-2" title="2"></a>
+<a class="sourceLine" id="cb2-3" title="3">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb2-4" title="4">    xs <span class="ot">&lt;-</span> <span class="fu">map</span> <span class="fu">read</span> <span class="fu">.</span> <span class="fu">words</span> <span class="fu">&lt;$&gt;</span> <span class="fu">getLine</span></a>
+<a class="sourceLine" id="cb2-5" title="5">    <span class="fu">putStrLn</span> <span class="fu">$</span> <span class="st">&quot;Sum: &quot;</span> <span class="fu">++</span> <span class="fu">show</span> (<span class="fu">sum</span> xs)</a></code></pre></div>
+<p>as baseline. We also generated a test file <code>data.txt</code> containing a single line of 10^5 space-separated randomly generated integers between 0 and 10^5.</p>
+<p>which is mostly for the sake of simplicity. We could have provided a concrete type like <code>Int</code>. This is indeed accelerate a bit the program, but it is not at all the bottleneck.</p>
+<p>With the <code>time</code> command line utility, the Python script took 0.05 seconds whereas the Haskell one, compiled with <code>-O2</code> flag, took 0.33 seconds (6x slower).</p>
+<h3 id="locate-the-bottleneck">Locate the bottleneck</h3>
+<p>Donald Knuth once said, <em>premature optimization is the root of all evil</em>, because we can easily <em>spent far too much time worrying about efficiency in the wrong places and at the wrong times</em>[^knuth]. This is bloody true. Bearing this in mind, we will first profile the program and find the bottleneck before any attempt of optimization.</p>
+<p>[knuth]: Computer Programming as an Art (1974), https://en.wikiquote.org/wiki/Donald_Knuth</p>
+<p>To profile the Haskell code, we insert some <a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html#inserting-cost-centres-by-hand">cost centers by hand</a> with the GHC pragma <code>SCC</code>:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" title="1"><span class="co">-- filename: BaselineProfile.hs</span></a>
+<a class="sourceLine" id="cb3-2" title="2"></a>
+<a class="sourceLine" id="cb3-3" title="3">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb3-4" title="4">    xs <span class="ot">&lt;-</span> <span class="ot">{-# SCC read_list #-}</span> <span class="fu">map</span> <span class="fu">read</span> <span class="fu">.</span> <span class="fu">words</span> <span class="fu">&lt;$&gt;</span> <span class="fu">getLine</span></a>
+<a class="sourceLine" id="cb3-5" title="5">    <span class="fu">putStrLn</span> <span class="fu">$</span> <span class="st">&quot;Sum: &quot;</span> <span class="fu">++</span> <span class="fu">show</span> (<span class="ot">{-# SCC sum_list #-}</span> <span class="fu">sum</span> xs)</a></code></pre></div>
+<p>Cost centers are program annotations around expressions that GHC’s profiling system assigns cost. It can be either generated automatically with <code>-fprof-auto</code> compiling flag or specified manually with pragma as we did here[^hand].</p>
+<p>which loses the point of profiling!</p>
+<p>Save the file as <code>BaselineProfile.hs</code>, then compile and run the program as follows</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb4-1" title="1">$ <span class="ex">stack</span> ghc -- -prof -rtsopts -O2 BaselineProfile.hs</a>
+<a class="sourceLine" id="cb4-2" title="2">$ <span class="fu">cat</span> /path/to/data <span class="kw">|</span> <span class="ex">./BaselineProfile</span> +RTS -p</a></code></pre></div>
+<p>When a GHC-compiled program is run with the -p RTS option, it generates a file called <code>&lt;program-name&gt;.prof</code>. In our case, the file will contain something like this (with irrelevant lines omitted)</p>
+<pre><code>	Sun Nov  4 10:40 2018 Time and Allocation Profiling Report  (Final)
+
+	   BaselineProfile +RTS -p -RTS
+
+	total time  =        0.55 secs   (548 ticks @ 1000 us, 1 processor)
+	total alloc = 595,340,832 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE    SRC                         %time %alloc
+
+read_list   Main      BaselineProfile.hs:2:33-60   99.5   99.7</code></pre>
+<p>As we can see, the seemingly innocent <code>read_list</code> cost center took more than 99% of time! The bottleneck being located, let’s figure out why is that and how can we do better.</p>
+<h3 id="optimization">Optimization</h3>
+<p>To read from standard input, we used the <code>getLine :: IO String</code> from the <code>System.IO</code> module[^prelude]. It produces a <code>String</code> which is nothing but a type alias of <code>[Char]</code>, a <code>List</code> of character. This could be inefficient for at least two reasons:</p>
+<ol type="1">
+<li><code>List</code> is essentially a singly linked list, which is lazy evaluated. Lazy evaluation often hurts the performance by <a href="https://wiki.haskell.org/Performance/Strictness">adding a constant overhead to everything</a>.</li>
+<li>Data from the input are in binary form. The <code>read_list</code> routine first parses binary to <code>[Char]</code> and then <code>[Char]</code> to <code>Int</code>. We could have gone directly from binary to <code>Int</code>.</li>
+</ol>
+<p>To address these two issues, we introduce two modules: <a href="https://hackage.haskell.org/package/text">Text</a> and <a href="https://hackage.haskell.org/package/bytestring">ByteString</a>.</p>
+<p>Note that with these two modules, we need to change both the <em>reading</em> (e.g. <code>getLine</code>) and <em>parsing</em> (e.g. <code>map read . words</code>) routine. Also, because they both export function names in conflict with ones in <code>Prelude</code>, we should use <a href="https://wiki.haskell.org/Import">qualified import</a>.</p>
+<h4 id="text">Text</h4>
+<p><code>Text</code> is an efficient packed, immutable Unicode text type (both strict and lazy), with a powerful <a href="https://wiki.haskell.org/GHC_optimisations#Fusion">loop fusion</a> optimization framework. It represents Unicode character strings, in a <em>time</em> and <em>space</em>-efficient manner. Moreover, it addresses the lazy evaluation issue by loading the entire data into memory by default.</p>
+<p><code>Data.Text.IO</code> exports <code>getLine :: IO T.Text</code>, which reads a line from standard input as our <code>Text</code> data type. A common mistake is to use then <code>words</code> from <code>Prelude</code> to split <code>Text</code> with spaces. This will not type-check and GHC complains</p>
+<pre><code>Couldn't match type ‘T.Text’ with ‘[Char]’</code></pre>
+<p>This makes perfectly sense, because <code>words</code> expects <code>[Char]</code> as input but <code>Text</code> is a new data type, not just a type synonym. Fortunately, <code>Data.Text</code> provides a counterpart also named (surprise!) <code>words :: T.Text -&gt; [T.Text]</code>.</p>
+<p>Then the problem comes: how can we <em>parse</em> a <code>Text</code> into an <code>Int</code>? Though <code>Text</code> and <code>Int</code> are both instances of <code>Read</code>, we cannot use <code>read</code> for neither <code>Text</code> nor <code>Int</code> since <code>read :: Read a =&gt; String -&gt; a</code>.</p>
+<p>Generally, we need a parser library which supports <code>Text</code> such as <a href="https://hackage.haskell.org/package/parsec">parsec</a>, <a href="https://hackage.haskell.org/package/attoparsec">attoparsec</a>. Since parsing numbers are so common, <code>Data.Text.Read</code> exports</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb7-1" title="1"><span class="ot">decimal ::</span> <span class="dt">Integral</span> a <span class="ot">=&gt;</span> <span class="dt">Either</span> <span class="dt">String</span> (a, <span class="dt">Text</span>)</a></code></pre></div>
+<p>which reads a decimal integer. The input must begin with at least one decimal digit, and is consumed until a non-digit or end of string is reached. If the read succeeds, return its value and the remaining text, otherwise an error message. Let’s see an example</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb8-1" title="1"><span class="dt">Prelude</span><span class="fu">&gt;</span> T.decimal <span class="fu">$</span> T.pack <span class="st">&quot;123&quot;</span></a>
+<a class="sourceLine" id="cb8-2" title="2"><span class="dt">Right</span>(<span class="dv">123</span>,<span class="st">&quot;&quot;</span>)</a>
+<a class="sourceLine" id="cb8-3" title="3"><span class="dt">Prelude</span><span class="fu">&gt;</span> T.decimal <span class="fu">$</span> T.pack <span class="st">&quot;123 456&quot;</span></a>
+<a class="sourceLine" id="cb8-4" title="4"><span class="dt">Right</span>(<span class="dv">123</span>,<span class="st">&quot; 456&quot;</span>)</a>
+<a class="sourceLine" id="cb8-5" title="5"><span class="dt">Prelude</span><span class="fu">&gt;</span> T.decimal <span class="fu">$</span> T.pack <span class="st">&quot;abc&quot;</span></a>
+<a class="sourceLine" id="cb8-6" title="6"><span class="dt">Left</span> <span class="st">&quot;input does not start with a digit&quot;</span></a></code></pre></div>
+<p>Note the second example, the parser reads as far as it can and return the unconsumed <code>Text</code> along with the parsed <code>Int</code>. This is <a href="https://hackage.haskell.org/package/base-4.12.0.0/docs/Text-ParserCombinators-ReadP.html#v:readP_to_S">the typical behavior</a> when running a parser. How can we parse all integers, instead of just the first one, and return them as a <code>List</code>? This is generally called <a href="https://en.wikipedia.org/wiki/Tokenization">tokenization</a> which produces a list of tokens for parsing. In our case, the tokenization is very simple: just <em>split</em> on spaces, and this is already done with <code>T.words</code>!</p>
+<p>The following code wraps everything[^import]</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb9-1" title="1"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></a>
+<a class="sourceLine" id="cb9-2" title="2"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.IO</span> <span class="kw">as</span> <span class="dt">T</span></a>
+<a class="sourceLine" id="cb9-3" title="3"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.Read</span> <span class="kw">as</span> <span class="dt">T</span></a>
+<a class="sourceLine" id="cb9-4" title="4"></a>
+<a class="sourceLine" id="cb9-5" title="5"><span class="ot">readText ::</span> <span class="dt">IO</span> [<span class="dt">Int</span>]</a>
+<a class="sourceLine" id="cb9-6" title="6">readText <span class="fu">=</span> <span class="fu">map</span> parse <span class="fu">.</span> T.words <span class="fu">&lt;$&gt;</span> T.getLine</a>
+<a class="sourceLine" id="cb9-7" title="7">    <span class="kw">where</span><span class="ot"> parse ::</span> <span class="dt">T.Text</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb9-8" title="8">          parse s <span class="fu">=</span> <span class="kw">let</span> <span class="dt">Right</span> (n, _) <span class="fu">=</span> T.decimal s <span class="kw">in</span> n</a></code></pre></div>
+<p>as long as there is no conflict in function names.</p>
+<h4 id="bytestring">ByteString</h4>
+<p><code>ByteString</code> is an efficient compact, immutable byte string type (both strict and lazy) suitable for binary or 8-bit character data. It is suitable for high performance use, both in terms of large data quantities, or high speed requirements. Moreover, <code>ByteString</code> functions follow the <strong>same</strong> style as Haskell’s ordinary lists, so it is easy to convert code from using <code>String</code> to <code>ByteString</code>. It addresses the second issue by parsing <strong>directly</strong> an Int from binary data.</p>
+<p>Since we only deal with integers in our case, we can use <code>Data.ByteString.Char8</code> module, which covers the subset of Unicode covered by code points 0-255.</p>
+<p>The code using <code>ByteString</code> is nearly the same as that using <code>Text</code></p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb10-1" title="1"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.ByteString.Char8</span> <span class="kw">as</span> <span class="dt">C</span></a>
+<a class="sourceLine" id="cb10-2" title="2"></a>
+<a class="sourceLine" id="cb10-3" title="3"><span class="ot">readByteString ::</span> <span class="dt">IO</span> [<span class="dt">Int</span>]</a>
+<a class="sourceLine" id="cb10-4" title="4">readByteString <span class="fu">=</span> <span class="fu">map</span> parse <span class="fu">.</span> C.words <span class="fu">&lt;$&gt;</span> C.getLine</a>
+<a class="sourceLine" id="cb10-5" title="5">    <span class="kw">where</span><span class="ot"> parse ::</span> <span class="dt">C.ByteString</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb10-6" title="6">          parse s <span class="fu">=</span> <span class="kw">let</span> <span class="dt">Just</span> (n, _) <span class="fu">=</span> C.readInt s <span class="kw">in</span> n</a></code></pre></div>
+<h3 id="benchmark">Benchmark</h3>
+<p>How is the speedup of using <code>Text</code> and <code>ByteString</code>? To answer this question, we need to <em>benchmark</em> our code. To this end, we will use the <a href="https://hackage.haskell.org/package/criterion">Criterion</a> library. We are not going to introduce Criterion in detail and refer interested readers to <a href="http://www.serpentine.com/criterion/tutorial.html">this excellent tutorial</a>.</p>
+<p>Criterion supports benchmarking IO functions. However, it is only possible to read from a file, not from standard input[^stdin]. Therefore, we modified our code so that it reads directly a file named <code>data.txt</code>.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb11-1" title="1"><span class="co">-- filename: Main.hs</span></a>
+<a class="sourceLine" id="cb11-2" title="2"></a>
+<a class="sourceLine" id="cb11-3" title="3"><span class="kw">import</span> <span class="dt">Control.Monad</span></a>
+<a class="sourceLine" id="cb11-4" title="4"><span class="kw">import</span> <span class="dt">Criterion.Main</span></a>
+<a class="sourceLine" id="cb11-5" title="5"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.ByteString.Char8</span> <span class="kw">as</span> <span class="dt">C</span></a>
+<a class="sourceLine" id="cb11-6" title="6"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></a>
+<a class="sourceLine" id="cb11-7" title="7"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.IO</span> <span class="kw">as</span> <span class="dt">T</span></a>
+<a class="sourceLine" id="cb11-8" title="8"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.Read</span> <span class="kw">as</span> <span class="dt">T</span></a>
+<a class="sourceLine" id="cb11-9" title="9"></a>
+<a class="sourceLine" id="cb11-10" title="10"><span class="ot">readBaseline ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> [<span class="dt">Int</span>]</a>
+<a class="sourceLine" id="cb11-11" title="11">readBaseline <span class="fu">=</span> <span class="fu">map</span> parse <span class="fu">.</span> <span class="fu">words</span></a>
+<a class="sourceLine" id="cb11-12" title="12">    <span class="kw">where</span><span class="ot"> parse ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb11-13" title="13">          parse <span class="fu">=</span> <span class="fu">read</span></a>
+<a class="sourceLine" id="cb11-14" title="14"></a>
+<a class="sourceLine" id="cb11-15" title="15"><span class="ot">readText ::</span> <span class="dt">T.Text</span> <span class="ot">-&gt;</span> [<span class="dt">Int</span>]</a>
+<a class="sourceLine" id="cb11-16" title="16">readText <span class="fu">=</span> <span class="fu">map</span> parse <span class="fu">.</span> T.words</a>
+<a class="sourceLine" id="cb11-17" title="17">    <span class="kw">where</span><span class="ot"> parse ::</span> <span class="dt">T.Text</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb11-18" title="18">          parse s <span class="fu">=</span> <span class="kw">let</span> <span class="dt">Right</span> (n, _) <span class="fu">=</span> T.decimal s <span class="kw">in</span> n</a>
+<a class="sourceLine" id="cb11-19" title="19"></a>
+<a class="sourceLine" id="cb11-20" title="20"></a>
+<a class="sourceLine" id="cb11-21" title="21"><span class="ot">readByteString ::</span> <span class="dt">C.ByteString</span> <span class="ot">-&gt;</span> [<span class="dt">Int</span>]</a>
+<a class="sourceLine" id="cb11-22" title="22">readByteString <span class="fu">=</span> <span class="fu">map</span> parse <span class="fu">.</span> C.words</a>
+<a class="sourceLine" id="cb11-23" title="23">    <span class="kw">where</span><span class="ot"> parse ::</span> <span class="dt">C.ByteString</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb11-24" title="24">          parse s <span class="fu">=</span> <span class="kw">let</span> <span class="dt">Just</span> (n, _) <span class="fu">=</span> C.readInt s <span class="kw">in</span> n</a>
+<a class="sourceLine" id="cb11-25" title="25"></a>
+<a class="sourceLine" id="cb11-26" title="26">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb11-27" title="27">    <span class="kw">let</span> filename <span class="fu">=</span> <span class="st">&quot;data.txt&quot;</span></a>
+<a class="sourceLine" id="cb11-28" title="28">    defaultMain [</a>
+<a class="sourceLine" id="cb11-29" title="29">                  bench <span class="st">&quot;readBaseline&quot;</span> <span class="fu">$</span> nfIO <span class="fu">$</span> <span class="fu">map</span> readBaseline <span class="fu">.</span> <span class="fu">lines</span> <span class="fu">&lt;$&gt;</span> <span class="fu">readFile</span> filename</a>
+<a class="sourceLine" id="cb11-30" title="30">                , bench <span class="st">&quot;readText&quot;</span> <span class="fu">$</span> nfIO <span class="fu">$</span> <span class="fu">map</span> readText <span class="fu">.</span> T.lines <span class="fu">&lt;$&gt;</span> T.readFile filename</a>
+<a class="sourceLine" id="cb11-31" title="31">                , bench <span class="st">&quot;readByteString&quot;</span> <span class="fu">$</span> nfIO <span class="fu">$</span> <span class="fu">map</span> readByteString <span class="fu">.</span> C.lines <span class="fu">&lt;$&gt;</span> C.readFile filename</a>
+<a class="sourceLine" id="cb11-32" title="32">                ]</a></code></pre></div>
+<p>Compile and run the above program with</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb12-1" title="1">$ <span class="ex">stack</span> ghc -- -O2 Main.hs</a>
+<a class="sourceLine" id="cb12-2" title="2">$ <span class="ex">./Main</span></a></code></pre></div>
+<p>and we got the following benchmark result</p>
+<pre><code>benchmarking readBaseline
+time                 346.7 ms   (344.5 ms .. 349.3 ms)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 346.5 ms   (345.9 ms .. 347.0 ms)
+std dev              640.7 μs   (447.9 μs .. 776.0 μs)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking readText
+time                 11.19 ms   (11.02 ms .. 11.30 ms)
+                     0.998 R²   (0.994 R² .. 1.000 R²)
+mean                 11.42 ms   (11.31 ms .. 11.75 ms)
+std dev              466.2 μs   (104.7 μs .. 907.9 μs)
+variance introduced by outliers: 17% (moderately inflated)
+
+benchmarking readByteString
+time                 7.216 ms   (7.173 ms .. 7.255 ms)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 7.230 ms   (7.217 ms .. 7.246 ms)
+std dev              45.26 μs   (38.18 μs .. 56.04 μs)</code></pre>
+<blockquote>
+<p>You can check the interactive benchmark report <a href="../files/benchmark-reading-ints.html">here</a></p>
+</blockquote>
+<p>Both the <code>Text</code> and <code>ByteString</code> version reduce significantly the run time. The <code>ByteString</code> version is slightly faster because it parses directly binary data into integers without intermediate types. Note also that these two versions also run <strong>much</strong> faster than the Python code.</p>
+
+<div id="disqus_thread"></div>
+<script>
+
+/**
+*  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+*  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+var disqus_config = function () {
+this.page.url = "https://boeingx.github.io/posts/2018-11-03-read-integers-efficiently-in-haskell.html";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = this.page.url; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+};
+(function() { // DON'T EDIT BELOW THIS LINE
+var d = document, s = d.createElement('script');
+s.src = 'https://boeingx.disqus.com/embed.js';
+s.setAttribute('data-timestamp', +new Date());
+(d.head || d.body).appendChild(s);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+
+    <div style="clear: both"></div>
+
+    <div id="footer">
+        Site proudly generated by
+        <a href="https://jaspervdj.be/hakyll">Hakyll</a>.
+        The source code of this website is
+        <a href="https://github.com/BoeingX/boeingx.github.io">
+        available on github</a>.
+    </div>
+</div>
+
+    </body>
+</html>
